@@ -27,7 +27,8 @@ fsize = 28
 params = {'legend.fontsize': 'large',
         # 'figure.figsize': (15,18),
         'font.family': 'Arial',
-        'font.weight': 'bold',
+        'font.weight': 'normal',
+        'figure.titlesize': fsize+2,
         'axes.labelsize': fsize,
         'axes.titlesize': fsize,
         'xtick.labelsize': fsize*0.8,
@@ -42,7 +43,7 @@ params = {'legend.fontsize': 'large',
         'ytick.minor.visible': True,
         'ytick.minor.width': 1.5,
         'ytick.minor.size': 5,
-        'axes.labelweight': 'bold',
+        'axes.labelweight': 'normal',
         'axes.linewidth': 2,
         'axes.titlepad': 25}
 plt.rcParams.update(params)
@@ -800,6 +801,7 @@ def NMR2D(datapath, procno=1, f1l=0, f1r=0, f2l=0, f2r=0, factor=0.02, clevels=6
         SR_2 = SR
         O1_2 = O1
     else:
+        # NUC_2 = '7Li'  # hardcode nucleus when acqus is wrong
     # Determine y axis values
         SR_2 = (SF_2-OBS_2)*1000000
 
@@ -1348,7 +1350,7 @@ def xf2(datapath, procno=1, mass=1, f2l=10, f2r=0):
     real_spectrum = real_spectrum[:int(SI_2),xlow:xhigh]
     # real_spectrum = real_spectrum[:,xlow:xhigh]
 
-    expt_parameters = {'NUC': NUC, "L1": L1, "CNST31": CNST31, "TD_2": TD_2}
+    expt_parameters = {'NUC': NUC, "L1": L1, "L2": L2, "CNST31": CNST31, "TD_2": TD_2}
 
     return xAxppm, real_spectrum, expt_parameters
 
@@ -1371,9 +1373,13 @@ def diff_params_import(datapath, NUC):
     DELTA = DELTA/1000  # [s]
     exD = float(root.find(".//exDiffCoff").text) # [m2/s]
     x_values_element = root.find(".//xValues/List")
-    x_values_list = x_values_element.text.split()
-    x_values = [float(value) for value in x_values_list]
-    Gradlist = x_values[1::4] # [G/cm]
+    if x_values_element:
+        x_values_list = x_values_element.text.split()
+        x_values = [float(value) for value in x_values_list]
+        Gradlist = x_values[1::4] # [G/cm]
+    else:
+        x_values_list = root.findall(".//X")
+        Gradlist = [float(i.attrib['g']) for i in x_values_list]
     Gradlist = [x/100 for x in Gradlist] # [T/m]
 
     gamma = find_gamma(NUC)  # [10^7 1/T/s]
@@ -1577,15 +1583,15 @@ def fit_1d_exsys(mixtimes, intensities, savename=None, fixed_t1=None, plot=True)
     return fit_result
 
 
-def T2_plot(peak_ints_norm, L1, CNST31):
+def T2_plot(peak_ints_norm, L1, L2, CNST31):
     """
     T2 plotting function, uses data read from the xf2 function
     T2_plot(peak_ints_norm, L1, CNST31)
     """
-    echo_delay = np.arange((2*L1/CNST31),(2*((L1)+(L2*(len(real_spectrum[:,0]))))/CNST31),2*L2/CNST31)
-    echo_delay *= 1000 # unit [=] ms
-    fig2,ax2 = plt.subplots()
-    lines = plt.plot(echo_delay,peak_ints_norm)
+    echo_delay = np.arange((2*L1/CNST31), (2*((L1)+(L2*(len(peak_ints_norm[:, 0]))))/CNST31), 2*L2/CNST31)
+    echo_delay *= 1000  # unit [=] ms
+    fig2, ax2 = plt.subplots()
+    lines = plt.plot(echo_delay, peak_ints_norm)
     ax2.set_xlabel("Echo delay / ms")
     ax2.set_ylabel("Normalized Intensity")
 
