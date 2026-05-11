@@ -1,8 +1,10 @@
 import os
 import re
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+
 from nmr_processing.leonmr import xf2, xf2_peak_pick
 
 

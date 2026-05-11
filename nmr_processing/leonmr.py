@@ -5,22 +5,24 @@
 # stackplot(datadir,Expt_no, nuc, f1p=0, f2p=0, plwidth=15,plheight=18, normalise=False)
 # NMR2D(datapath, procno=1, mass=1, f1l=0, f1r=0, f2l=0, f2r=0, factor = 0.02, clevels = 6, frame=False, homonuclear=False, plheight =18, plwidth = 18)
 
-import numpy as np
-import pandas as pd
+import math
 import os
 from pathlib import Path
+
 import matplotlib.pyplot as plt
-from matplotlib.ticker import FormatStrFormatter
+import numpy as np
+import pandas as pd
 import scipy.optimize
-from scipy.optimize import curve_fit
-from scipy.signal import find_peaks
 from lmfit import Model
 from lmfit.models import PseudoVoigtModel
-import math
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import cm
 from matplotlib.colors import LogNorm
+from matplotlib.ticker import FormatStrFormatter
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from scipy.optimize import curve_fit
+from scipy.signal import find_peaks
 from ssNMR.formatting import format_plot  # remove eventually
+
 # from sklearn.metrics import r2_score
 
 # Plot parameters
