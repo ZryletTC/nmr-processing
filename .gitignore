@@ -1,3 +1,11 @@
+## Project-specific ignores
+# Don't save SIR data/fitting files
+*.mch
+*.dat
+*.csv
+*.plt
+*.out
+
 ## Python gitignore section
 # Byte-compiled / optimized / DLL files
 __pycache__/
