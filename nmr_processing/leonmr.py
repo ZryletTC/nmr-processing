@@ -20,6 +20,7 @@ import math
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import cm
 from matplotlib.colors import LogNorm
+from ssNMR.formatting import format_plot  # remove eventually
 # from sklearn.metrics import r2_score
 
 # Plot parameters
@@ -1388,6 +1389,50 @@ def diff_params_import(datapath, NUC):
     return delta, DELTA, exD, Gradlist, gamma
 
 
+def plot_slice(datapath, slice_idx=0, procno=1, mass=1, f2l=1, f2r=-1,
+               savefile="", normalize=True):
+    """
+    Plot a single slice from a pseudo-2D experiment. Defaults to first slice.
+    Will save plot to savefile path if specified.
+    """
+
+    xAxppm, real_spectrum, expt_parameters = xf2(datapath=datapath,
+                                                 procno=procno, mass=mass,
+                                                 f2l=f2l, f2r=f2r)
+
+    if normalize:
+        first_slice = real_spectrum[0, :]
+        last_slice = real_spectrum[-1, :]
+        best_slice = (first_slice if (np.sum(first_slice) > np.sum(last_slice))
+                      else last_slice)
+
+        min_best_slice = min(best_slice)
+        best_slice = best_slice-min_best_slice
+        max_best_slice = max(best_slice)
+        best_slice = best_slice/max_best_slice
+        real_spectrum = real_spectrum-min_best_slice
+        real_spectrum = real_spectrum/max_best_slice
+
+    fig, ax = plt.subplots()
+    plt.plot(xAxppm, real_spectrum[slice_idx])
+
+    ax.invert_xaxis()
+    # ax.set_xlabel("Shift / ppm")
+    # ax.set_ylabel("Normalized Intensity")
+
+    if f2l or f2r:
+        if f2l < f2r:
+            plt.xlim(f2r, f2l)
+        else:
+            plt.xlim(f2l, f2r)
+
+    plt.tight_layout()
+    if savefile:
+        plt.savefig(savefile)
+
+    return fig, ax
+
+
 def xf2_peak_pick(xAxppm, real_spectrum, prominence=[0.001, 1],
                   peak_pos=float("NaN"), f1p=0, f2p=0, plot=True):
     """
@@ -1708,3 +1753,337 @@ def T2_Fit(x, y, t0=0.5,c0=1,beta0=0.5,showall=False,fittype = "default"):
         plt.show()
 
     display(f"R² = {R_max}")
+
+
+def T1_IR_func(time, T1, init_intensity, A):
+    #fit T1 for inversion recovery measurement
+    time = np.array(time, dtype=np.longdouble)
+    T1 = np.array(T1, dtype=np.longdouble)
+    return init_intensity*(1-2*A*np.exp(-1*time/T1))
+
+def T1_SR_func(time, T1, init_intensity, A):
+    #fit T1 for saturation recovery measurement
+    time = np.array(time, dtype=np.longdouble)
+    T1 = np.array(T1, dtype=np.longdouble)
+    return init_intensity*(1-A*np.exp(-1*time/T1))
+
+## Eventually want to make these functions fit in here better
+def fit_T1_IR(save_dir, save_name, delay_data, intensity_data, labels=None, normalize=False,
+    show_plot=True, colors=['red', 'blue', 'green']):
+    """
+    DESCRIPTION:  Given delay and intensity data for a T1 inversion recovery experiment, extract out the T1 time constant in s
+    PARAMETERS:
+        save_dir: string
+            Directory to save plot figure
+        save_name: string
+            Figure save file name
+        delay_data: array of arrays
+            List of delay data each acquistion was run at, for each resonance, i.e. [delay_para, delay_dia],
+            where delay_para = delay_para = [1,2,3,4,5,6,7,8,10,20,30,40,50,60,70,80]
+        intensity_data: array of arrays
+            List of the intensity values extracted from a component/ group of components after fitting the spectra
+        labels: array of strings
+            Label names for each component/ group of components
+        normalize: boolean
+            Whether or not to normalize the plot values.
+    RETURNS: [T2_list, unscaled_percentages, scaled_percentages]
+        T2_list: array of floats
+            list of T1 constants corresponding to each component/ group of components specified in intensity_data, index-matched
+        unscaled_percentages: array of floats
+            list of unscaled molar percentages of each component/ group of components specified in intensity_data, index-matched
+        scaled_percentages: array of floats
+            list of T1 scaled molar percentages of each component/ group of components specified in intensity_data, index-matched
+    """
+
+    extracted_intensities = []
+    initial_intensities = []
+    T1_list = []
+    # print('delay_data: {}'.format(delay_data))
+    # print('intensity_data: {}'.format(intensity_data))
+    # print('labels: {}'.format(labels))
+    norm_factor = [intensity[-1] for intensity in intensity_data]
+
+    plt, ax = format_plot(fig_size=(8,8))
+
+    if not labels:
+        labels = [f'Feature {i+1}' for i in range(len(intensity_data))]
+
+    for i in range(len(intensity_data)):
+        label = labels[i]
+
+        delay = np.array(delay_data) # delay times in s
+        intensity = np.array(intensity_data[i])
+        if normalize:
+            initial_intensities.append(intensity[-1])
+            intensity = intensity / intensity[-1]
+        else:
+            initial_intensities.append(intensity[-1])
+
+        plt.plot(delay, intensity, 'o', color=colors[i], label=label)
+
+        popt, pcov = curve_fit(T1_IR_func, delay, intensity, p0=[delay[-1], intensity[-1], 1], maxfev=5000,
+                               bounds=(0,[np.inf,np.inf,2]))
+        T1 = popt[0]
+        init_intensity = popt[1]
+        A = popt[2]
+
+        std_dev = np.sqrt(np.diag(pcov))
+        T1_std_dev = std_dev[0]
+        init_intensity_std_dev = std_dev[1]
+        A_std = std_dev[2]
+
+        if normalize:
+            abs_init_intensity = init_intensity*norm_factor[i]
+            abs_init_intensity_std_dev = init_intensity_std_dev*norm_factor[i]
+        else:
+            abs_init_intensity = init_intensity
+            abs_init_intensity_std_dev = init_intensity_std_dev
+
+        extracted_intensities.append(abs_init_intensity)
+        T1_list.append(T1)
+
+        print('-----------------------------------------------')
+        print('*****{} fitting results*****'.format(label))
+        print('-----------------------------------------------')
+        print('T1 constant: {} s'.format(np.round(T1, 6)))
+        print('T1 constant std dev: {} s'.format(np.round(T1_std_dev, 4)))
+        print('Initial intensity: {}'.format(np.round(abs_init_intensity, 0)))
+        print('Initial intensity std dev: {}'.format(np.round(abs_init_intensity_std_dev, 0)))
+        print('A: {}'.format(np.round(A, 4)))
+        print('A std dev: {}'.format(np.round(A, 4)))
+
+        xfit = np.linspace(min(delay),max(delay))
+        plt.plot(xfit, T1_IR_func(xfit, T1, init_intensity, A), '-', color='black')
+
+    plt.xlabel('Time (s)')
+    if normalize:
+        plt.ylabel('Normalized Intensity (a.u.)')
+    else:
+        plt.ylabel('Intensity (a.u.)')
+    plt.legend(prop={'size': 22}, frameon=False).set_draggable(True)
+
+    text = '\n'.join([f'{label} T1 = {t1:.3f} s' for label,t1 in zip(labels,T1_list)])
+    ax.text(0.9, 0.5, text, horizontalalignment='right',
+            verticalalignment='center', transform=ax.transAxes)
+
+    plt.savefig(save_dir + save_name + '.png', bbox_inches='tight', dpi=300)
+    if show_plot:
+        plt.show()
+    plt.close()
+
+    return T1_list
+
+## Eventually want to make these functions fit in here better
+def fit_T1_SR(save_dir, save_name, delay_data, intensity_data, labels=None, normalize=False,
+    show_plot=True, colors=['red', 'blue', 'green']):
+    """
+    DESCRIPTION:  Given delay and intensity data for a T1 saturation recovery experiment, extract out the T1 time constant in s
+    PARAMETERS:
+        save_dir: string
+            Directory to save plot figure
+        save_name: string
+            Figure save file name
+        delay_data: array of arrays
+            List of delay data each acquistion was run at, for each resonance, i.e. [delay_para, delay_dia],
+            where delay_para = delay_para = [1,2,3,4,5,6,7,8,10,20,30,40,50,60,70,80]
+        intensity_data: array of arrays
+            List of the intensity values extracted from a component/ group of components after fitting the spectra
+        labels: array of strings
+            Label names for each component/ group of components
+        normalize: boolean
+            Whether or not to normalize the plot values.
+    RETURNS: [T2_list, unscaled_percentages, scaled_percentages]
+        T2_list: array of floats
+            list of T1 constants corresponding to each component/ group of components specified in intensity_data, index-matched
+        unscaled_percentages: array of floats
+            list of unscaled molar percentages of each component/ group of components specified in intensity_data, index-matched
+        scaled_percentages: array of floats
+            list of T1 scaled molar percentages of each component/ group of components specified in intensity_data, index-matched
+    """
+
+    extracted_intensities = []
+    initial_intensities = []
+    T1_list = []
+    # print('delay_data: {}'.format(delay_data))
+    # print('intensity_data: {}'.format(intensity_data))
+    # print('labels: {}'.format(labels))
+    norm_factor = [intensity[-1] for intensity in intensity_data]
+
+    plt, ax = format_plot(fig_size=(8,8))
+
+    if not labels:
+        labels = [f'Feature {i+1}' for i in range(len(intensity_data))]
+
+    for i in range(len(intensity_data)):
+        label = labels[i]
+
+        delay = np.array(delay_data) # delay times in s
+        intensity = np.array(intensity_data[i])
+        if normalize:
+            initial_intensities.append(intensity[-1])
+            intensity = intensity / intensity[-1]
+        else:
+            initial_intensities.append(intensity[-1])
+
+        plt.plot(delay, intensity, 'o', color=colors[i], label=label)
+
+        popt, pcov = curve_fit(T1_SR_func, delay, intensity, p0=[delay[-1], intensity[-1], 1], maxfev=5000,
+                               bounds=(0,[np.inf,np.inf,1]))
+        T1 = popt[0]
+        init_intensity = popt[1]
+        A = popt[2]
+
+        std_dev = np.sqrt(np.diag(pcov))
+        T1_std_dev = std_dev[0]
+        init_intensity_std_dev = std_dev[1]
+        A_std = std_dev[2]
+
+        if normalize:
+            abs_init_intensity = init_intensity*norm_factor[i]
+            abs_init_intensity_std_dev = init_intensity_std_dev*norm_factor[i]
+        else:
+            abs_init_intensity = init_intensity
+            abs_init_intensity_std_dev = init_intensity_std_dev
+
+        extracted_intensities.append(abs_init_intensity)
+        T1_list.append(T1)
+
+        print('-----------------------------------------------')
+        print('*****{} fitting results*****'.format(label))
+        print('-----------------------------------------------')
+        print('T1 constant: {} s'.format(np.round(T1, 6)))
+        print('T1 constant std dev: {} s'.format(np.round(T1_std_dev, 4)))
+        print('Initial intensity: {}'.format(np.round(abs_init_intensity, 0)))
+        print('Initial intensity std dev: {}'.format(np.round(abs_init_intensity_std_dev, 0)))
+        print('A: {}'.format(np.round(A, 4)))
+        print('A std dev: {}'.format(np.round(A, 4)))
+
+        xfit = np.linspace(min(delay),max(delay))
+        plt.plot(xfit, T1_SR_func(xfit, T1, init_intensity, A), '-', color='black')
+
+    plt.xlabel('Time (s)')
+    if normalize:
+        plt.ylabel('Normalized Intensity (a.u.)')
+    else:
+        plt.ylabel('Intensity (a.u.)')
+    plt.legend(prop={'size': 22}, frameon=False).set_draggable(True)
+
+    text = '\n'.join([f'{label} T1 = {t1:.3f} s' for label,t1 in zip(labels,T1_list)])
+    ax.text(0.9, 0.5, text, horizontalalignment='right',
+            verticalalignment='center', transform=ax.transAxes)
+
+    if savename:
+        plt.savefig(savename, bbox_inches='tight', dpi=300)
+    if show_plot:
+        plt.show()
+    plt.close()
+
+    return T1_list
+
+def fit_T1_spectra(data_files, delays, fit_range, components_list=None, comp_constraints=None,
+        comp_names=None, normalize=False, comp_groups=[], group_names=[],
+        fit_ssb=False, ssb_list=[], mas_freq=30000,
+        print_results=True, show_plot=True, plot_init_fit=True, show_lgd=True, lgd_loc=0, lgd_fsize=22,
+        save_name=None, summary_save_dir=None, fig_save_dir=None,
+        data_color='black', fit_color='red', init_fit_color='green', comp_colors=None,   group_comp_colors=['blue', 'red'],
+        saturation=False):
+    """
+    DESCRIPTION:  Given a set of T1 relaxation data, automatically fit all spectra, and extract of T1 constants and
+                  scaled intensity values for all components
+    PARAMETERS:
+        data_files: list of strings
+            List of files containing T1 relaxation experiments, with varying interpulse delays
+        delays: array of floats
+            List of delays for each of the spectra in data_files, index-matched
+        normalize: boolean
+            Whether or not to normalize the plot for T1 intensity decay
+        **kwargs: key-word arguments
+            key-word arguments corresponding to the 'fit' function. See 'fit' function for details
+    RETURNS: [T1_list, unscaled_percentages, scaled_percentages]
+        T1_list: array of floats
+            list of T1 constants (in s) corresponding to each component/ group of components specified in intensity_data, index-matched
+        unscaled_percentages: array of floats
+            list of unscaled molar percentages of each component/ group of components specified in intensity_data, index-matched
+        scaled_percentages: array of floats
+            list of T2 scaled molar percentages of each component/ group of components specified in intensity_data, index-matched
+    """
+    amplitudes = []
+    comp_group_index = []
+    comp_labels = []
+    plt, ax = format_plot(
+        fig_size=(8,8),
+    )
+
+    for comp_name in comp_names:
+        assigned_group = False
+        for i, group in enumerate(comp_groups):
+            if comp_name in group:
+                comp_group_index.append(i)
+                assigned_group = True
+                if group_names[i] not in comp_labels:
+                    comp_labels.append(group_names[i])
+                else:
+                    comp_labels.append(None)
+        if not assigned_group:
+            comp_group_index.append(-1)
+            comp_labels.append(comp_name)
+    # assigning colors to components
+    colors = []
+    default_colors = []
+    for index in comp_group_index:
+        if index != -1:
+            colors.append(group_comp_colors[index])
+        else:
+            color = next(ax._get_lines.prop_cycler)['color']
+            colors.append(color)
+            default_colors.append(color)
+    if len(comp_groups) > 0:
+        for i in range(len(comp_groups)):
+            amplitudes.append([])
+    else:
+        for i in range(len(components_list)):
+            amplitudes.append([])
+    if len(comp_groups) > 0:
+        colors = group_comp_colors
+    plt.close()
+    for i, data_file in enumerate(data_files):
+        save_name = os.path.splitext(os.path.basename(data_file))[0].replace('.txt', '')
+
+        print(data_file)
+        print(delays[i])
+        freq_ppm_data, intensity_data, model_result, groupless_amplitudes, group_amplitudes= \
+            fit(data_file=data_file, fit_range=fit_range, components_list=components_list, comp_constraints=comp_constraints,
+                comp_names=comp_names, comp_groups=comp_groups, group_names=group_names, fit_ssb=fit_ssb, ssb_list=ssb_list,
+                mas_freq=mas_freq, print_results=print_results, show_plot=show_plot, plot_init_fit=plot_init_fit,
+                show_lgd=show_lgd, lgd_loc=lgd_loc, lgd_fsize=lgd_fsize, save_name=save_name, summary_save_dir=summary_save_dir,
+                fig_save_dir=fig_save_dir, data_color=data_color, fit_color=fit_color, init_fit_color=init_fit_color,
+                comp_colors=comp_colors, group_comp_colors=group_comp_colors)
+        if len(comp_groups) > 0:
+            for i in range(len(comp_groups)):
+                amplitudes[i].append(group_amplitudes[i])
+        else:
+            for i in range(len(components_list)):
+                amplitudes[i].append(groupless_amplitudes[i])
+    if len(comp_groups) > 0:
+        delay_data = len(comp_groups)*[delays]
+        labels = group_names
+    else:
+        delay_data = len(components_list)*[delays]
+        labels = comp_names
+
+    print(np.array(amplitudes).shape)
+    print(amplitudes)
+
+    func = fit_T1_SR if saturation else fit_T1_IR
+
+    T1_list, unscaled_percentages, scaled_percentages = func(
+        save_dir=fig_save_dir,
+        save_name=save_name,
+        delay_data=delay_data,
+        intensity_data=amplitudes,
+        labels=labels,
+        normalize=normalize,
+        colors=colors,
+        show_plot=True
+    )
+    return [T1_list, unscaled_percentages, scaled_percentages]
