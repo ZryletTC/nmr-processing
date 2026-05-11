@@ -23,9 +23,10 @@ from matplotlib.colors import LogNorm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.optimize import curve_fit
 from scipy.signal import find_peaks
-from ssNMR.formatting import format_plot  # remove eventually
+from sklearn.metrics import r2_score
 
-# from sklearn.metrics import r2_score
+# TODO: remove dependence on ssNMR
+from ssNMR.formatting import fit, format_plot
 
 # Plot parameters
 fsize = 28
@@ -68,10 +69,7 @@ def NMR1D(
     normalise=False,
 ):
     """
-    x, y = NMR1D(datapath, procno=1, mass=1, showplot=True, f1p=0, f2p=0,
-                 plwidth=15,plheight=12,normalise=False)
-
-    Function to plot stacked 1D NMR data from raw Bruker files.
+    Function to plot 1D NMR data from raw Bruker files.
 
     datapath: top-level experiment folder containing the 2D NMR data
     procno: process number of data to be plotted (default = 1)
@@ -205,8 +203,8 @@ def NMR1D(
     return xAxppm, real_spectrum, fig, ax
 
 
-############################################################################################################################
-############################################################################################################################
+########################################################################################
+########################################################################################
 
 
 def NUC_label(NUC):
@@ -248,24 +246,22 @@ def NUC_label(NUC):
     ]
     if NUC in spinhalflist:
         labeltext = (
-            "$\mathregular{^{" + NUCnum + "}}$" + NUCalpha + " chemical shift / ppm"
+            r"$\mathregular{^{" + NUCnum + "}}$" + NUCalpha + " chemical shift / ppm"
         )
     else:
-        labeltext = "$\mathregular{^{" + NUCnum + "}}$" + NUCalpha + " shift / ppm"
+        labeltext = r"$\mathregular{^{" + NUCnum + "}}$" + NUCalpha + " shift / ppm"
     return labeltext
 
 
-############################################################################################################################
-############################################################################################################################
+########################################################################################
+########################################################################################
 
 
 def stackplotfolder(
     datadir, Expt_no, nuc, f1p=0, f2p=0, plwidth=15, plheight=18, normalise=False
 ):
     """
-    stackplot(datadir,Expt_no, nuc, f1p=0, f2p=0, plwidth=15,plheight=18, normalise=False)
-
-    Function to plot stacked 1D NMR data from raw Bruker files.
+    Function to plot stacked all 1D NMR data from a folder of raw Bruker files.
 
     datadir: top-level data directory containing all 1D NMR experiment folders.
     Expt_no: list of experiment numbers (e.g., [1, 5, 6, 10])
@@ -310,9 +306,7 @@ def overlayplotfolder(
     datadir, Expt_no, nuc, f1p=0, f2p=0, plwidth=15, plheight=18, normalise=False
 ):
     """
-    stackplot(datadir,Expt_no, nuc, f1p=0, f2p=0, plwidth=15,plheight=18, normalise=False)
-
-    Function to plot stacked 1D NMR data from raw Bruker files.
+    Function to plot overlaid 1D NMR data from raw Bruker files.
 
     datadir: top-level data directory containing all 1D NMR experiment folders.
     Expt_no: list of experiment numbers (e.g., [1, 5, 6, 10])
@@ -380,7 +374,6 @@ def readfolder(datadir, Expt_no, normalise=False):
 
 def stackplot(datapath, nuc, f1p=0, f2p=0, plwidth=15, plheight=18, normalise=False):
     """
-    stackplot(datadir,Expt_no, nuc, f1p=0, f2p=0, plwidth=15,plheight=18, normalise=False)
 
     Function to plot stacked 1D NMR data from raw Bruker files.
 
@@ -422,21 +415,24 @@ def stackplot(datapath, nuc, f1p=0, f2p=0, plwidth=15, plheight=18, normalise=Fa
     return fig, ax
 
 
-##################################
-########## 2D NMR Plot ###########
-##################################
+########################################################################################
+########################################################################################
+
+
 def get_2D_data(datapath, procno=1, f1l=0, f1r=0, f2l=0, f2r=0, homonuclear=False):
     """
-    xppm, yppm, 2d_intensities = get_2D_data(datapath, procno=1, f1l=0, f1r=0, f2l=0, f2r=0, homonuclear=False)
+    Function to get 2D NMR data from raw Bruker files. 1D data are projections along
+    each axis by summation over each dimension. May update for optional external
+    projections.
 
-    Function to get 2D NMR data from raw Bruker files. 1D data are projections along each axis by summation over each dimension.
-    May update for optional external projections.
+    Returns: (xppm, yppm, 2d_intensities)
 
     datapath: top-level experiment folder containing the 2D NMR data
     procno: process number of data to be plotted (default = 1)
     f1l/f1r: left and right limits of F1 (vertical) dimension
     f2l/f2r: left and right limits of F2 (horizontal) dimension
-    homonuclear: True/False, based on whether experiment is homo/heteronuclear (default = False)
+    homonuclear: True/False, based on whether experiment is homo/heteronuclear
+                 (default = False)
     """
 
     real_spectrum_path = os.path.join(datapath, "pdata", str(procno), "2rr")
@@ -679,7 +675,9 @@ def get_2D_data(datapath, procno=1, f1l=0, f1r=0, f2l=0, f2r=0, homonuclear=Fals
     if XDIM_F1 == 1:
         real_spectrum_2d = real_spectrum.reshape([int(SI_2), int(SI)])
     else:
-        # to shape the column matrix according to Bruker's format, matrices are broken into (XDIM_F1,XDIM_F2) submatrices, so reshaping where XDIM_F1!=1 requires this procedure.
+        # to shape the column matrix according to Bruker's format, matrices are broken
+        # into (XDIM_F1,XDIM_F2) submatrices, so reshaping where XDIM_F1!=1 requires
+        # this procedure.
         column_matrix = real_spectrum
         submatrix_rows = int(SI_2 // XDIM_F1)
         submatrix_cols = int(SI // XDIM_F2)
@@ -715,19 +713,22 @@ def NMR2D(
     plwidth=12,
 ):
     """
-    fig, ax, 2d_spectrum = NMR2D(datapath, procno=1, f1l=0, f1r=0, f2l=0, f2r=0, factor = 0.02, clevels = 6, homonuclear=False, plheight =12, plwidth = 12)
+    Function to plot 2D NMR data from raw Bruker files. 1D data are projections along
+    each axis by summation over each dimension. May update for optional external
+    projections.
 
-    Function to plot 2D NMR data from raw Bruker files. 1D data are projections along each axis by summation over each dimension.
-    May update for optional external projections.
+    Returns: fig, ax, 2d_spectrum
 
     datapath: top-level experiment folder containing the 2D NMR data
     procno: process number of data to be plotted (default = 1)
     f1l/f1r: left and right limits of F1 (vertical) dimension
     f2l/f2r: left and right limits of F2 (horizontal) dimension
-    factor: minimum value for the contours (factor*max value) (default = 0.02, 2% of max signal)
+    factor: minimum value for the contours (factor*max value)
+            (default = 0.02, 2% of max signal)
     clevels: number of contour levels for plot (default = 6)
     colour: log-scaled colour contours or just black lines (default = True, colour on)
-    homonuclear: True/False, based on whether experiment is homo/heteronuclear (default = False)
+    homonuclear: True/False, based on whether experiment is homo/heteronuclear
+                 (default = False)
     plheight/plwidth: plot height/width in inches (default = 12x12)
     """
 
@@ -1007,7 +1008,7 @@ def NMR2D(
 
     if colour:
         real_spectrum_2d = np.ma.masked_where(real_spectrum_2d <= 0, real_spectrum_2d)
-        cs = ax.contour(
+        _ = ax.contour(
             xAxppm,
             yAxppm,
             real_spectrum_2d,
@@ -1016,7 +1017,7 @@ def NMR2D(
             norm=LogNorm(),
         )
     else:
-        cs = ax.contour(
+        _ = ax.contour(
             xAxppm, yAxppm, real_spectrum_2d, colors="black", levels=thresvec
         )
     ax.tick_params(pad=6)
@@ -1256,14 +1257,13 @@ def sim_diffusion(NUC, delta=1, DELTA=20, maxgrad=17, D=0):
     B = [(2 * np.pi * gamma * delta * i) ** 2 * (DELTA - (delta / 3)) for i in G]
 
     if switch == 0:
-        I = np.zeros(shape=(len(D), len(G)))
+        intensities = np.zeros(shape=(len(D), len(G)))
         cnt = 0
         for j in D:
-            Inow = np.exp(np.multiply(-j, B))
-            I[cnt] = Inow
+            intensities[cnt] = np.exp(np.multiply(-j, B))
             cnt += 1
     else:
-        I = np.exp(np.multiply(-D, B))
+        intensities = np.exp(np.multiply(-D, B))
 
     fig, ax = plt.subplots()
     if switch == 0:
@@ -1271,27 +1271,31 @@ def sim_diffusion(NUC, delta=1, DELTA=20, maxgrad=17, D=0):
         [
             plt.plot(
                 G,
-                I[k, :],
+                intensities[k, :],
                 color=c,
                 linewidth=2,
-                label=str(D[k]) + " $\mathregular{m^2 s^{–1}}$",
+                label=str(D[k]) + r" $\mathregular{m^2 s^{–1}}$",
             )
             for k, c in zip(range(len(D)), colmap)
         ]
     else:
         plt.plot(
-            G, I, linewidth=2, color="r", label=str(D) + " $\mathregular{m^2 s^{–1}}$"
+            G,
+            intensities,
+            linewidth=2,
+            color="r",
+            label=str(D) + r" $\mathregular{m^2 s^{–1}}$",
         )
     ax.set_xlim(0, maxgrad * 1.25)
     plt.legend(loc="upper right", frameon=False)
-    plt.xlabel("Gradient Strength, g / $\mathregular{T m^{–1}}$")
-    plt.ylabel("Intensity, $\mathregular{I/I_0}$")
+    plt.xlabel(r"Gradient Strength, g / $\mathregular{T m^{–1}}$")
+    plt.ylabel(r"Intensity, $\mathregular{I/I_0}$")
     plt.show()
     return fig, ax
 
 
 def xf2(datapath, procno=1, mass=1, f2l=10, f2r=0):
-    """ Return (xAxppm, real_spectrum, expt_parameters)."""
+    """Return (xAxppm, real_spectrum, expt_parameters)."""
 
     real_spectrum_path = os.path.join(datapath, "pdata", str(procno), "2rr")
     procs = os.path.join(datapath, "pdata", str(procno), "procs")
@@ -1487,7 +1491,9 @@ def xf2(datapath, procno=1, mass=1, f2l=10, f2r=0):
     if XDIM_F1 == 1:
         real_spectrum = real_spectrum.reshape([int(SI_2), int(SI)])
     else:
-        # to shape the column matrix according to Bruker's format, matrices are broken into (XDIM_F1,XDIM_F2) submatrices, so reshaping where XDIM_F1!=1 requires this procedure.
+        # to shape the column matrix according to Bruker's format, matrices are broken
+        # into (XDIM_F1,XDIM_F2) submatrices, so reshaping where XDIM_F1!=1 requires
+        # this procedure.
         column_matrix = real_spectrum
         submatrix_rows = int(SI_2 // XDIM_F1)
         submatrix_cols = int(SI // XDIM_F2)
@@ -1638,10 +1644,10 @@ def xf2_peak_pick(
         pl = find_peaks(best_slice, prominence=prominence)
         pl = pl[0]  # indices of picked peaks
         peak_positions = xAxppm[pl]  # ppm values of picked peaks
-        cols = [str(round(items, 2)) for items in peak_positions]
+        # cols = [str(round(items, 2)) for items in peak_positions]
     else:
         pl = [np.where(xAxppm <= peak_pos)[0][0]]  # broken!
-        cols = ["peak"]
+        # cols = ["peak"]
 
     # best_slice_pl = real_spectrum[0,pl]
     # peak_slices = real_spectrum[:,pl]
@@ -1804,7 +1810,8 @@ def fit_1d_exsys(mixtimes, intensities, savename=None, fixed_t1=None, plot=True)
 
     # if fixed_t1 is None:
     #     model = exsy1dfit
-    #     popt, pconv = curve_fit(exsy1dfit, mixtimes, intensities, p0=[DEFAULT_K, DEFAULT_T1])
+    #     popt, pconv = curve_fit(exsy1dfit, mixtimes, intensities,
+    #                             p0=[DEFAULT_K, DEFAULT_T1])
     # else:
     #     model = exsy1dfit_fixedt1(fixed_t1)
     #     popt, pconv = curve_fit(exsy1dfit, mixtimes, intensities, p0=[DEFAULT_K])
@@ -1840,7 +1847,7 @@ def T2_plot(peak_ints_norm, L1, L2, CNST31):
     )
     echo_delay *= 1000  # unit [=] ms
     fig2, ax2 = plt.subplots()
-    lines = plt.plot(echo_delay, peak_ints_norm)
+    plt.plot(echo_delay, peak_ints_norm)
     ax2.set_xlabel("Echo delay / ms")
     ax2.set_ylabel("Normalized Intensity")
 
@@ -1853,8 +1860,8 @@ def diff_plot(peak_ints_norm, datapath, NUC):
     delta, DELTA, expD, G, gamma = diff_params_import(datapath, NUC)
     # print(delta,DELTA,expD,G, gamma)
     fig2, ax2 = plt.subplots()
-    lines = plt.plot(G, peak_ints_norm, "o")  # , c='red', mfc='blue', mec='blue')
-    ax2.set_xlabel("Gradient Strength / G cm$\mathregular{^{-1}}$")
+    plt.plot(G, peak_ints_norm, "o")  # , c='red', mfc='blue', mec='blue')
+    ax2.set_xlabel(r"Gradient Strength / G cm$\mathregular{^{-1}}$")
     ax2.set_ylabel("Normalized Intensity")
     grad_params = {"delta": delta, "DELTA": DELTA, "gamma": gamma, "expD": expD}
     return G, grad_params
@@ -1933,7 +1940,10 @@ def T2_Fit(x, y, t0=0.5, c0=1, beta0=0.5, showall=False, fittype="default"):
     if YY == monoT2:
         txt_disp = f"T$_2$ = {round(float(mono_t),6)}"
     elif YY == biexpT2:
-        txt_disp = f"Component 1: T$_2$ = {round(t1,6)} ms, w = {round(m1,3)}\nComponent 2: T$_2$ = {round(t2,6)} ms, w = {round(m2,3)}"
+        txt_disp = (
+            f"Component 1: T$_2$ = {round(t1,6)} ms, w = {round(m1,3)}\n"
+            f"Component 2: T$_2$ = {round(t2,6)} ms, w = {round(m2,3)}"
+        )
     elif YY == stretchT2:
         txt_disp = (
             f"T$_2$ = {round(str_t,6)} ms\nβ = {round(beta,3)}"  # \nc = {round(c,3)}'
@@ -1960,7 +1970,7 @@ def T2_Fit(x, y, t0=0.5, c0=1, beta0=0.5, showall=False, fittype="default"):
         plt.ylim(-0.05, max(y) * 1.1)
         plt.show()
 
-    display(f"R² = {R_max}")
+    print(f"R² = {R_max}")
 
 
 def T1_IR_func(time, T1, init_intensity, A):
@@ -1977,7 +1987,7 @@ def T1_SR_func(time, T1, init_intensity, A):
     return init_intensity * (1 - A * np.exp(-1 * time / T1))
 
 
-## Eventually want to make these functions fit in here better
+# Eventually want to make these functions fit in here better
 def fit_T1_IR(
     save_dir,
     save_name,
@@ -1989,28 +1999,35 @@ def fit_T1_IR(
     colors=["red", "blue", "green"],
 ):
     """
-    DESCRIPTION:  Given delay and intensity data for a T1 inversion recovery experiment, extract out the T1 time constant in s
+    DESCRIPTION:
+    Given delay and intensity data for a T1 inversion recovery experiment, extract out
+    the T1 time constant in s
+
     PARAMETERS:
         save_dir: string
             Directory to save plot figure
         save_name: string
             Figure save file name
         delay_data: array of arrays
-            List of delay data each acquistion was run at, for each resonance, i.e. [delay_para, delay_dia],
-            where delay_para = delay_para = [1,2,3,4,5,6,7,8,10,20,30,40,50,60,70,80]
+            List of delay data each acquistion was run at, for each resonance,
+            i.e. [delay_para, delay_dia], where delay_para = [1,3,5,7,10,30,50,80]
         intensity_data: array of arrays
-            List of the intensity values extracted from a component/ group of components after fitting the spectra
+            List of the intensity values extracted from a component/ group of
+            components after fitting the spectra
         labels: array of strings
             Label names for each component/ group of components
         normalize: boolean
             Whether or not to normalize the plot values.
     RETURNS: [T2_list, unscaled_percentages, scaled_percentages]
         T2_list: array of floats
-            list of T1 constants corresponding to each component/ group of components specified in intensity_data, index-matched
+            list of T1 constants corresponding to each component/ group of components
+            specified in intensity_data, index-matched
         unscaled_percentages: array of floats
-            list of unscaled molar percentages of each component/ group of components specified in intensity_data, index-matched
+            list of unscaled molar percentages of each component/ group of components
+            specified in intensity_data, index-matched
         scaled_percentages: array of floats
-            list of T1 scaled molar percentages of each component/ group of components specified in intensity_data, index-matched
+            list of T1 scaled molar percentages of each component/ group of components
+            specified in intensity_data, index-matched
     """
 
     extracted_intensities = []
@@ -2054,7 +2071,7 @@ def fit_T1_IR(
         std_dev = np.sqrt(np.diag(pcov))
         T1_std_dev = std_dev[0]
         init_intensity_std_dev = std_dev[1]
-        A_std = std_dev[2]
+        # A_std = std_dev[2]
 
         if normalize:
             abs_init_intensity = init_intensity * norm_factor[i]
@@ -2119,28 +2136,34 @@ def fit_T1_SR(
     colors=["red", "blue", "green"],
 ):
     """
-    DESCRIPTION:  Given delay and intensity data for a T1 saturation recovery experiment, extract out the T1 time constant in s
+    Given delay and intensity data for a T1 saturation recovery experiment, extract out
+    the T1 time constant in s
+
     PARAMETERS:
         save_dir: string
             Directory to save plot figure
         save_name: string
             Figure save file name
         delay_data: array of arrays
-            List of delay data each acquistion was run at, for each resonance, i.e. [delay_para, delay_dia],
-            where delay_para = delay_para = [1,2,3,4,5,6,7,8,10,20,30,40,50,60,70,80]
+            List of delay data each acquistion was run at, for each resonance,
+            i.e. [delay_para, delay_dia], where delay_para = [1,3,5,7,10,30,50,80]
         intensity_data: array of arrays
-            List of the intensity values extracted from a component/ group of components after fitting the spectra
+            List of the intensity values extracted from a component or group of
+            components after fitting the spectra
         labels: array of strings
             Label names for each component/ group of components
         normalize: boolean
             Whether or not to normalize the plot values.
     RETURNS: [T2_list, unscaled_percentages, scaled_percentages]
         T2_list: array of floats
-            list of T1 constants corresponding to each component/ group of components specified in intensity_data, index-matched
+            list of T1 constants corresponding to each component or group of components
+            specified in intensity_data, index-matched
         unscaled_percentages: array of floats
-            list of unscaled molar percentages of each component/ group of components specified in intensity_data, index-matched
+            list of unscaled molar percentages of each component or group of components
+            specified in intensity_data, index-matched
         scaled_percentages: array of floats
-            list of T1 scaled molar percentages of each component/ group of components specified in intensity_data, index-matched
+            list of T1 scaled molar percentages of each component or group of components
+            specified in intensity_data, index-matched
     """
 
     extracted_intensities = []
@@ -2184,7 +2207,7 @@ def fit_T1_SR(
         std_dev = np.sqrt(np.diag(pcov))
         T1_std_dev = std_dev[0]
         init_intensity_std_dev = std_dev[1]
-        A_std = std_dev[2]
+        # A_std = std_dev[2]
 
         if normalize:
             abs_init_intensity = init_intensity * norm_factor[i]
@@ -2230,8 +2253,8 @@ def fit_T1_SR(
         transform=ax.transAxes,
     )
 
-    if savename:
-        plt.savefig(savename, bbox_inches="tight", dpi=300)
+    if save_name:
+        plt.savefig(save_name, bbox_inches="tight", dpi=300)
     if show_plot:
         plt.show()
     plt.close()
@@ -2269,24 +2292,30 @@ def fit_T1_spectra(
     saturation=False,
 ):
     """
-    DESCRIPTION:  Given a set of T1 relaxation data, automatically fit all spectra, and extract of T1 constants and
-                  scaled intensity values for all components
+    Given a set of T1 relaxation data, automatically fit all spectra, and extract of T1
+    constants and scaled intensity values for all components
+
     PARAMETERS:
         data_files: list of strings
-            List of files containing T1 relaxation experiments, with varying interpulse delays
+            List of files containing T1 relaxation experiments, with varying interpulse
+            delays
         delays: array of floats
             List of delays for each of the spectra in data_files, index-matched
         normalize: boolean
             Whether or not to normalize the plot for T1 intensity decay
         **kwargs: key-word arguments
-            key-word arguments corresponding to the 'fit' function. See 'fit' function for details
+            key-word arguments corresponding to the 'fit' function. See 'fit' function
+            for details
     RETURNS: [T1_list, unscaled_percentages, scaled_percentages]
         T1_list: array of floats
-            list of T1 constants (in s) corresponding to each component/ group of components specified in intensity_data, index-matched
+            list of T1 constants (in s) corresponding to each component or group of
+            components specified in intensity_data, index-matched
         unscaled_percentages: array of floats
-            list of unscaled molar percentages of each component/ group of components specified in intensity_data, index-matched
+            list of unscaled molar percentages of each component or group of components
+            specified in intensity_data, index-matched
         scaled_percentages: array of floats
-            list of T2 scaled molar percentages of each component/ group of components specified in intensity_data, index-matched
+            list of T2 scaled molar percentages of each component or group of components
+            specified in intensity_data, index-matched
     """
     amplitudes = []
     comp_group_index = []

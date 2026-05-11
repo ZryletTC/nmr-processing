@@ -389,7 +389,7 @@ def plot_cifit_csv(
         outtext = outtext[outtext.find("Final") :]
         # print(outtext)
         # TODO: Check if regex still work with double quotes and raw string
-        match = re.search('No. \d+=\s*([\.\d]+)\nChi', outtext)  # fmt: skip
+        match = re.search('No. \d+=\s*([\.\d]+)\nChi', outtext)  # fmt: skip # noqa
         # print(match)
         if match:
             rate = match.group(1)
