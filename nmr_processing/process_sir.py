@@ -1,3 +1,12 @@
+"""
+Utilities for reading and processing SIR-specific NMR intensity files.
+
+This module includes helpers for reading T1 intensity files and variable delay lists
+used in SIR/T1 relaxation experiments.
+
+TODO: move 1d exsys functions from leonmr.py
+"""
+
 import os
 import re
 
