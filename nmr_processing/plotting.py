@@ -12,7 +12,7 @@ TODO: Add overlay function for data not in same folder
 
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib import cm
+from matplotlib import colormaps
 from matplotlib.colors import LogNorm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
@@ -314,7 +314,7 @@ def plot_2d(
             y,
             z,
             levels=thresvec,
-            cmap=cm.seismic,
+            cmap=colormaps["seismic"],
             norm=LogNorm(),
         )
     else:
@@ -494,7 +494,7 @@ def sim_diffusion(
             intensity_data[cnt] = np.exp(np.multiply(-j, exponent_coefficient_list))
             cnt += 1
 
-        colmap = cm.seismic(np.linspace(0, 1, len(diff_coeff)))
+        colmap = colormaps["seismic"](np.linspace(0, 1, len(diff_coeff)))
         for k, c in zip(range(len(diff_coeff)), colmap):
             plt.plot(
                 gradient_vals,
