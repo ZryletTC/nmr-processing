@@ -201,7 +201,10 @@ def make_mch_file(
     """
     if matrix:
         matrix = np.array(matrix)
-        assert matrix.shape == (sites, sites)
+        if matrix.shape != (sites, sites):
+            raise ValueError(
+                "matrix must be a square array of shape `sites` by `sites`!"
+            )
     else:
         if processes == 1:
             matrix = np.ones((sites, sites)) - np.diag(np.ones(sites))
@@ -218,13 +221,17 @@ def make_mch_file(
 
     if not R1_guesses:
         R1_guesses = [1 / 0.462, 1 / 2.141]  # Example reciprocal of LPSC and LZC T1s
-    assert len(R1_guesses) == sites
+
+    if len(R1_guesses) != sites:
+        raise ValueError("`r1_guesses` must be of length `sites`!")
+
     mch_lines.extend(["", " ".join(map(str, R1_guesses))])
     if tp2:
         mch_lines.append(" ".join(map(str, np.ones(sites, dtype=np.int8))))
 
     if M_f_guesses:
-        assert len(M_f_guesses) == sites
+        if len(M_f_guesses) != sites:
+            raise ValueError("`M_f_guesses` must be of length `sites`!")
     else:
         M_f_guesses = np.ones(sites)  # Final intensities are normalized, so 1
     mch_lines.extend(["", " ".join(map(str, M_f_guesses))])
@@ -232,7 +239,8 @@ def make_mch_file(
         mch_lines.append(" ".join(map(str, np.ones(sites, dtype=np.int8))))
 
     if M_0_guesses:
-        assert len(M_0_guesses) == sites
+        if len(M_0_guesses) != sites:
+            raise ValueError("`M_0_guesses` must be of length `sites`!")
     else:
         # This is a bad guess, it should be more like 1, -1
         M_0_guesses = np.ones(sites)
@@ -241,7 +249,8 @@ def make_mch_file(
         mch_lines.append(" ".join(map(str, np.ones(sites, dtype=np.int8))))
 
     if k_guesses:
-        assert len(k_guesses) == processes
+        if len(k_guesses) != sites:
+            raise ValueError("`k_guesses` must be of length `sites`!")
     else:
         k_guesses = np.ones(processes)  # This is a bad guess
 
@@ -268,7 +277,8 @@ def make_dat_file(filename, delays, intensities, title="TEST", names=[]):
 
     numpoints = len(delays)
     intensities = np.array(intensities)
-    assert intensities.shape[0] == numpoints
+    if intensities.shape[0] != numpoints:
+        raise ValueError("`delays` and `intensities` must have the same length!")
 
     data_lines.extend(["", str(numpoints), ""])
 
