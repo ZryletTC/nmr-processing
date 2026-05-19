@@ -33,7 +33,7 @@ def read_t1ints(exp_path, proc_num=1, delay_offset=True, normalize=True):
     times = []
     ints = []
 
-    with open(t1ints_path, "r") as file:
+    with open(t1ints_path, "r", encoding="utf-8") as file:
         line = file.readline()  # skip first line
         line = file.readline()
         while not line.startswith("-"):
@@ -84,7 +84,7 @@ def load_vdlist(
         # else:
         try:
             delays.append(float(val))
-        except ValueError:
+        except ValueError as exc:
             num = float(val.rstrip("pnum"))
             c = val[-1]
             if c == "p":
@@ -96,7 +96,7 @@ def load_vdlist(
             elif c == "m":
                 num *= 1e-3
             else:
-                raise ValueError(f"Unexpected value in vdlist: {val}")
+                raise ValueError(f"Unexpected value in vdlist: {val}") from exc
             delays.append(num)
     delays = np.array(delays)
 
@@ -151,20 +151,24 @@ def make_cifit_files(
     delays,
     intensities,
     title=None,
-    names=[],
-    R1_guesses=[],
+    names=None,
+    r1_guesses=None,
     tp2=False,
-    k_guesses=[],
-    matrix=[],
-    M_0_guesses=[],
-    M_f_guesses=[],
+    k_guesses=None,
+    matrix=None,
+    M_0_guesses=None,
+    M_f_guesses=None,
 ):
     make_dat_file(
         filename, delays=delays, intensities=intensities, title=title, names=names
     )
 
     intensities = np.array(intensities)
-    M_0_guesses = M_0_guesses if M_0_guesses else list(intensities[0])
+
+    if not M_0_guesses:
+        M_0_guesses = list(intensities[0])
+    if not M_f_guesses:
+        M_f_guesses = list(intensities[-1])
 
     make_mch_file(
         filename,
@@ -172,7 +176,7 @@ def make_cifit_files(
         sites=intensities.shape[1],
         M_0_guesses=M_0_guesses,
         M_f_guesses=M_f_guesses,
-        R1_guesses=R1_guesses,
+        r1_guesses=r1_guesses,
         tp2=tp2,
         k_guesses=k_guesses,
         matrix=matrix,
@@ -183,11 +187,11 @@ def make_mch_file(
     filename,
     sites=2,
     processes=1,
-    R1_guesses=[],
-    k_guesses=[],
-    M_f_guesses=[],
-    M_0_guesses=[],
-    matrix=[],
+    r1_guesses=None,
+    k_guesses=None,
+    M_f_guesses=None,
+    M_0_guesses=None,
+    matrix=None,
     title="TEST",
     tp2=False,
 ):
@@ -219,13 +223,12 @@ def make_mch_file(
 
     mch_lines.extend(["", f"{sites} {processes}"])
 
-    if not R1_guesses:
-        R1_guesses = [1 / 0.462, 1 / 2.141]  # Example reciprocal of LPSC and LZC T1s
-
-    if len(R1_guesses) != sites:
+    if not r1_guesses:
+        r1_guesses = [1 / 0.462, 1 / 2.141]  # Example reciprocal of LPSC and LZC T1s
+    elif len(r1_guesses) != sites:
         raise ValueError("`r1_guesses` must be of length `sites`!")
 
-    mch_lines.extend(["", " ".join(map(str, R1_guesses))])
+    mch_lines.extend(["", " ".join(map(str, r1_guesses))])
     if tp2:
         mch_lines.append(" ".join(map(str, np.ones(sites, dtype=np.int8))))
 
@@ -252,7 +255,7 @@ def make_mch_file(
         if len(k_guesses) != sites:
             raise ValueError("`k_guesses` must be of length `sites`!")
     else:
-        k_guesses = np.ones(processes)  # This is a bad guess
+        k_guesses = np.ones(processes)  # FIXME: This is a bad guess
 
     for i in range(processes):
         if tp2:
@@ -268,11 +271,11 @@ def make_mch_file(
                 if matrix[j][k] != 0:
                     mch_lines.append(f"{j} {k} {matrix[j][k]}")
 
-    with open(filename + ".mch", "w") as file:
+    with open(filename + ".mch", "w", encoding="utf-8") as file:
         file.writelines(s + "\n" for s in mch_lines)
 
 
-def make_dat_file(filename, delays, intensities, title="TEST", names=[]):
+def make_dat_file(filename, delays, intensities, title="TEST", names=None):
     data_lines = [title]
 
     numpoints = len(delays)
@@ -282,10 +285,12 @@ def make_dat_file(filename, delays, intensities, title="TEST", names=[]):
 
     data_lines.extend(["", str(numpoints), ""])
 
-    if list(names):
+    if names:
+        if not isinstance(names, (list, np.ndarray)):
+            raise TypeError("names parameter must be of type `list` or `ndarray`")
         comment = "# Tmix, " + ", ".join(map(str, names))
     else:
-        comment = "# Tmix, unknown intensities..."
+        comment = "# Tmix, intensities..."
     data_lines.append(comment)
 
     delays = delays.reshape(numpoints, 1)
@@ -299,7 +304,7 @@ def make_dat_file(filename, delays, intensities, title="TEST", names=[]):
     # data_str = np.array_str(data, precision=5, suppress_small=True)
     # data_lines.extend(data_str.strip('[] ').split(']\n ['))
 
-    with open(filename + ".dat", "w") as file:
+    with open(filename + ".dat", "w", encoding="utf-8") as file:
         file.writelines(s + "\n" for s in data_lines)
 
 
@@ -307,14 +312,14 @@ def exp_to_cifit(
     exp_path,
     outfile=None,
     proc_num=1,
-    peak_pos=[],
-    peak_names=[],
-    T1_values=[],
+    peak_pos=None,
+    peak_names=None,
+    t1_values=None,
     tp2=False,
-    k_guesses=[],
-    matrix=[],
-    M_0_guesses=[],
-    M_f_guesses=[],
+    k_guesses=None,
+    matrix=None,
+    M_0_guesses=None,
+    M_f_guesses=None,
     ints=True,
 ):
     # Add plotting back into sir functions
@@ -332,11 +337,13 @@ def exp_to_cifit(
 
     if peak_names and positions:
         if len(peak_names) != len(positions):
-            raise ValueError(f"Wrong number of peak names, should be {len(positions)}")
+            raise ValueError(f"Wrong number of peak names, should be {len(positions)}!")
     else:
         peak_names = [f"{s:.2f} ppm" for s in positions]
 
-    R1_guesses = [1 / T1 for T1 in T1_values]
+    if not t1_values:
+        t1_values = [0.462, 2.141]  # Example T1 values of LPSC and LZC in s
+    r1_guesses = [1 / t1 for t1 in t1_values]
 
     if outfile is None:
         outfile = exp_path
@@ -347,7 +354,7 @@ def exp_to_cifit(
         ints,
         title=title,
         names=peak_names,
-        R1_guesses=R1_guesses,
+        r1_guesses=r1_guesses,
         tp2=tp2,
         k_guesses=k_guesses,
         matrix=matrix,
@@ -357,7 +364,7 @@ def exp_to_cifit(
 
 
 def plot_cifit_csv(
-    filepath, nsites=2, names=[], data_rows=16, fit_rows=101, savepath=""
+    filepath, nsites=2, names=None, data_rows=16, fit_rows=101, savepath=""
 ):
     cols = ["delay"]
     cols.extend(map(str, range(nsites * 3)))
@@ -388,7 +395,7 @@ def plot_cifit_csv(
     # print('FIT_DF')
     # print(fit_df)
 
-    if len(names) == 0:
+    if not names:
         names = [f"Site {i+1}" for i in range(nsites)]
 
     _, ax = plt.subplots()
@@ -405,7 +412,7 @@ def plot_cifit_csv(
 
     outpath = filepath.replace(".csv", ".out")
     if os.path.exists(outpath):
-        with open(outpath, "r") as f:
+        with open(outpath, "r", encoding="utf-8") as f:
             outtext = f.read()
         outtext = outtext[outtext.find("Final") :]
         # print(outtext)
@@ -443,7 +450,7 @@ def plot_cifit_csv(
 ########################
 # Functions from leonmr:
 ########################
-def get_1d_exsy_data(datapath, exp_nums, peak_pos=None, plot=False):
+def get_1d_exsy_data(datapath, exp_nums):
     # TODO: Use nmrglue to get D15 value
     d15s = []
     for exp_num in exp_nums:

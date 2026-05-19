@@ -533,18 +533,17 @@ def sim_diffusion(
     return bundle
 
 
-def plot_t2_relaxation(peak_ints_norm, L1, L2, CNST31):
+def plot_t2_relaxation(peak_ints_norm, l1, l2, cnst31):
     """
-    T2 plotting function, uses data read from the xf2 function
-    T2_plot(peak_ints_norm, L1, CNST31)
+    Plot data of a T2 relaxation experiment. Use `get_pseudo2d_data` to read data.
 
     TODO: Wrap T2_plot so user can provide just exp_path
     """
 
     echo_delay = np.arange(
-        (2 * L1 / CNST31),
-        (2 * ((L1) + (L2 * (len(peak_ints_norm[:, 0])))) / CNST31),
-        2 * L2 / CNST31,
+        (2 * l1 / cnst31),
+        (2 * ((l1) + (l2 * (len(peak_ints_norm[:, 0])))) / cnst31),
+        2 * l2 / cnst31,
     )
     echo_delay *= 1000  # unit = ms
 
