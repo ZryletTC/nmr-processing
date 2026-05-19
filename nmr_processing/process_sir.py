@@ -126,16 +126,18 @@ def process_sir(
     delays = load_vdlist(vdlist, delay_offset=delay_offset)
 
     bundle = get_pseudo2d_data(exp_path, proc_num=proc_num)
-    x_vals_ppm = bundle["x_vals_ppm"]
-    y_data = bundle["y_data"]
+    x_vals_ppm = np.array(bundle["x_vals_ppm"])
+    y_data = np.array(bundle["y_data"])
 
     if peak_pos:
         intensities = get_peak_slice_intensities(x_vals_ppm, y_data, peak_pos=peak_pos)
     elif regions:
         ints = []
-        # FIXME: region subset not used
-        for f2l, f2r in regions:
-            ints.append(np.trapz(x_vals_ppm, y_data))
+        for x_min, x_max in regions:
+            if x_min > x_max:
+                x_min, x_max = x_max, x_min
+            idx_filter = (x_vals_ppm >= x_min) & (x_vals_ppm <= x_max)
+            ints.append(np.trapz(x_vals_ppm[idx_filter], y_data[idx_filter]))
         intensities = np.concatenate(ints, axis=1)
     else:
         peak_pick_bundle = get_peak_slice_intensities(
