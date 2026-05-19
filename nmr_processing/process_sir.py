@@ -452,24 +452,15 @@ def plot_cifit_csv(
 ########################
 # Functions from leonmr:
 ########################
-def get_1d_exsy_data(datapath, exp_nums):
-    # TODO: Use nmrglue to get D15 value
-    d15s = []
+def get_1d_exsy_data(dir_path, exp_nums):
+    d15_vals = []
     for exp_num in exp_nums:
-        Dstr = "##$D= (0..63)"
-        acqus = os.path.join(datapath, str(exp_num), "acqus")
-        with open(acqus, "rb") as input:
-            for line in input:
-                if Dstr in line.decode():
-                    line = next(input)
-                    linestr = line.decode()
-                    D = linestr.strip("\n").split(" ")
-                    D15 = float(D[15])
-                    break
-        d15s.append(D15)
-    d15s = np.array(d15s)
+        exp_path = os.path.join(dir_path, str(exp_num))
+        metadata = bruker.read_acqus_file(exp_path)
+        d15_vals.append(metadata["acqus"]["D"][15])
+    d15_vals = np.array(d15_vals)
 
-    data_bundle = get_data_from_folder(datapath, exp_nums)
+    data_bundle = get_data_from_folder(dir_path, exp_nums)
     if "x_vals_ppm" not in data_bundle:
         raise ValueError("x_vals_ppm don't match for all experiments! Can not proceed.")
     x_vals_ppm = data_bundle["x_vals_ppm"]
@@ -479,11 +470,11 @@ def get_1d_exsy_data(datapath, exp_nums):
     proc_bundle = get_peak_slice_intensities(x_vals_ppm=x_vals_ppm, y_data=y_data)
     peak_ints_norm = proc_bundle["peak_ints_norm"]
 
-    return d15s, peak_ints_norm
+    return d15_vals, peak_ints_norm
 
 
-def analyze_lpsc_1d_exsys(datapath, exp_nums, plot=False):
-    first_path = os.path.join(datapath, str(exp_nums[0]))
+def analyze_lpsc_1d_exsys(dir_path, exp_nums, plot=False):
+    first_path = os.path.join(dir_path, str(exp_nums[0]))
 
     if plot:
         bundle = plot_1d(first_path, f1p=3, f2p=-3.2)
@@ -527,22 +518,14 @@ def analyze_lpsc_1d_exsys(datapath, exp_nums, plot=False):
         min=first_fit.best_values["p2_center"] - 0.2,
     )
 
-    d15s = []
+    d15_vals = []
     for exp_num in exp_nums:
-        Dstr = "##$D= (0..63)"
-        acqus = os.path.join(datapath, str(exp_num), "acqus")
-        with open(acqus, "rb") as input:
-            for line in input:
-                if Dstr in line.decode():
-                    line = next(input)
-                    linestr = line.decode()
-                    D = linestr.strip("\n").split(" ")
-                    D15 = float(D[15])
-                    break
-        d15s.append(D15)
-    d15s = np.array(d15s)
+        exp_path = os.path.join(dir_path, str(exp_num))
+        metadata = bruker.read_acqus_file(exp_path)
+        d15_vals.append(metadata["acqus"]["D"][15])
+    d15_vals = np.array(d15_vals)
 
-    bundle = get_data_from_folder(datapath, exp_nums[1:])
+    bundle = get_data_from_folder(dir_path, exp_nums[1:])
 
     x_vals_ppm = bundle["x_vals_ppm"]
     spectra = bundle["y_data"]
@@ -561,7 +544,7 @@ def analyze_lpsc_1d_exsys(datapath, exp_nums, plot=False):
         for fit in lpsc_fits
     ]
 
-    return d15s, [p1_ints, p2_ints]
+    return d15_vals, [p1_ints, p2_ints]
 
 
 def fit_1d_exsys(mixtimes, intensities, savename=None, fixed_t1=None, plot=True):
