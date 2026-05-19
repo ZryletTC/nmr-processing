@@ -1,7 +1,11 @@
 name: "Run TODO to Issue"
-on: [ "push" ]
+on:
+  push:
+    branches:
+      - main
 jobs:
   build:
+    if: github.repository == 'clement-group/nmr-processing'
     runs-on: "ubuntu-latest"
     permissions:
       issues: write
