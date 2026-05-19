@@ -195,6 +195,8 @@ def nucleus_label(nucleus):
 def find_gamma(nuclide):
     """
     Return the gyromagnetic_ratio (gamma) of a given nuclide.
+
+    nuclide: String of the format {mass number}{symbol}, e.g. '1H' or '27Al'.
     """
 
     df = pd.DataFrame(NMR_NUCLEI_LIST)

@@ -3,10 +3,12 @@ Functions for plotting data from raw Bruker NMR files.
 
 All functions return a dictionary containing data and/or figures with appropriate keys.
 
-TODO: sim_diffusion, plot_slice, diff_plot, T2_plot, T1_plot
+TODO: add a plot_t1_relaxation function
+TODO: set plwidth/height at plt.subplots, not later
+TODO: Change f1p/f2p to xmax and update the way it's checked
+TODO: Allow kwarg input via bundle
+TODO: Add overlay function for data not in same folder
 """
-
-import os
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -14,8 +16,14 @@ from matplotlib import cm
 from matplotlib.colors import LogNorm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from nmr_processing.processing import get_1d_data, get_2d_data
-from nmr_processing.utils import nucleus_label
+from nmr_processing.processing import (
+    get_1d_data,
+    get_2d_data,
+    get_data_from_folder,
+    get_diff_params,
+    get_pseudo2d_data,
+)
+from nmr_processing.utils import find_gamma, nucleus_label
 
 # Plot parameters
 FONT_SIZE = 28
@@ -46,29 +54,17 @@ params = {
 plt.rcParams.update(params)
 
 
-def plot_1d_nmr(
-    arg,
-    proc_num=1,
-    mass=1,
-    f1p=0,
-    f2p=0,
-    plwidth=15,
-    plheight=12,
-    normalize=False,
-):
+def plot_1d(arg, proc_num=1, f1p=0, f2p=0, plwidth=15, plheight=12):
     """
     Plot 1D NMR data from raw Bruker files.
 
     The first argument must be either:
 
     bundle: Dictionary containing the data used for plotting.
-    data_path: Top-level experiment folder containing the 1D NMR data.
+    exp_path: Top-level experiment folder containing the 1D NMR data.
 
     proc_num: Process number of data to be plotted (default = 1). If bundle provided,
               this does nothing.
-    mass: Mass of sample for comparison to others (default = 1).
-    normalize: Normalize max intensities if true. If False, normalize by mass if list of
-               masses provided, otherwise do not normalize. (default = False).
     f1p/f2p: Left and right limits of x-axis, order agnostic.
     plheight/plwidth: Plot height/width in inches (default = 15x18).
     """
@@ -76,8 +72,8 @@ def plot_1d_nmr(
     if isinstance(arg, dict):
         bundle = arg
     elif isinstance(arg, str):
-        data_path = arg
-        bundle = get_1d_data(data_path, proc_num=proc_num)
+        exp_path = arg
+        bundle = get_1d_data(exp_path, proc_num=proc_num)
     else:
         raise TypeError(
             "The first argument of this function must be a string of the path to the "
@@ -96,12 +92,6 @@ def plot_1d_nmr(
             x_low, x_high = x_high, x_low
         x_vals_ppm = x_vals_ppm[x_low:x_high]
         y_data = y_data[x_low:x_high]
-
-    if normalize:
-        # y_data -= min(y_data)
-        y_data /= max(y_data)
-    else:
-        y_data = y_data / mass
 
     fig, ax = plt.subplots()
     plt.plot(x_vals_ppm, y_data, "k", linewidth=3)
@@ -130,7 +120,7 @@ def plot_1d_nmr(
 
 def plot_folder(
     arg,
-    exp_num_list=None,
+    exp_nums=None,
     mass=1,
     normalize=False,
     f1p=0,
@@ -148,9 +138,9 @@ def plot_folder(
             {'exp_1': exp_bundle, 'exp_5': exp_bundle, 'exp_6': exp_bundle, etc.}.
     dir_path: Top-level data directory containing all 1D NMR experiment folders.
 
-    exp_num_list: List of experiment numbers (e.g., [1, 5, 6, 10]). If bundle provided,
-                 this does nothing. Providing an empty list (default) will plot all
-                 experiments in the folder.
+    exp_nums: List of experiment numbers (e.g., [1, 5, 6, 10]). If bundle provided,
+              this does nothing. Providing an empty list (default) will plot all
+              experiments in the folder.
     mass: List of masses for each experiment for normalization.
     normalize: Normalize max intensities if true. If False, normalize by mass if list of
                masses provided, otherwise do not normalize. (default = False).
@@ -166,19 +156,7 @@ def plot_folder(
         bundle = arg
     elif isinstance(arg, str):
         dir_path = arg
-        bundle = {}
-
-        # If exp_num_list not provided, use all experiment-numbered folders in dir_path
-        if exp_num_list is None:
-            exp_num_list = [
-                item
-                for item in os.listdir(dir_path)
-                if os.path.isdir(os.path.join(dir_path, item)) and item.isnumeric()
-            ]
-
-        for exp_num in exp_num_list:
-            data_path = os.path.join(dir_path, str(exp_num))
-            bundle[f"exp_{exp_num}"] = get_1d_data(data_path)
+        bundle = get_data_from_folder(dir_path=dir_path, exp_nums=exp_nums)
     else:
         raise TypeError(
             "The first argument of this function must be a string of the path to a "
@@ -199,7 +177,7 @@ def plot_folder(
         else:
             y_data = y_data / mass
 
-        plt.plot(x_data, y_data + y_offset)
+        plt.plot(x_data, y_data + y_offset, label=f"exp {exp_num}")
         y_offset = y_offset + max(y_data) * stacking_factor
 
     if f1p + f2p != 0:
@@ -230,7 +208,7 @@ def plot_folder(
     return bundle
 
 
-def plot_2d_nmr(
+def plot_2d(
     arg,
     proc_num=1,
     f1l=0,
@@ -248,9 +226,8 @@ def plot_2d_nmr(
     Function to plot 2D NMR data from raw Bruker files.
 
     The first argument must be either:
-
     bundle: Dictionary containing the data used for plotting.
-    data_path: Top-level experiment folder containing the 2D NMR data.
+    exp_path: Top-level experiment folder containing the 2D NMR data.
 
     proc_num: Process number of data to be plotted (default = 1). If bundle provided,
               this does nothing.
@@ -263,13 +240,15 @@ def plot_2d_nmr(
             lines (default = True, color on).
     plheight/plwidth: Plot height/width in inches (default = 12x12).
     show_projections: If False, hide projections along each axis. Default = True.
+
+    CHECK: Does this work with psuedo-2D data?
     """
 
     if isinstance(arg, dict):
         bundle = arg
     elif isinstance(arg, str):
-        data_path = arg
-        bundle = get_2d_data(data_path, proc_num=proc_num)
+        exp_path = arg
+        bundle = get_2d_data(exp_path, proc_num=proc_num)
     else:
         raise TypeError(
             "The first argument of this function must be a string of the path to the "
@@ -393,5 +372,203 @@ def plot_2d_nmr(
 
     bundle["fig"] = fig
     bundle["ax"] = ax
+
+    return bundle
+
+
+def plot_slice(
+    arg, proc_num=1, slice_idx=0, plwidth=15, plheight=12, f2l=1, f2r=-1, save_path=""
+):
+    """
+    Plot a single slice from a pseudo-2D experiment. Defaults to first slice.
+
+    Will save plot to save_path path if specified.
+
+    The first argument must be either:
+    bundle: Dictionary containing the data used for plotting.
+    exp_path: Top-level experiment folder containing the 2D NMR data.
+
+    proc_num: Process number of data to be plotted (default = 1). If bundle provided,
+              this does nothing.
+    slice_idx: The slice to plot, with a zero-based index.
+    f2l/f2r: Left and right limits in ppm.
+    plheight/plwidth: Plot height/width in inches (default = 12x12).
+    save_path: The path to save the plot figure to. Will not save if not provided.
+
+    TODO: Make plot_slice work with true 2D data.
+    """
+
+    if isinstance(arg, dict):
+        bundle = arg
+    elif isinstance(arg, str):
+        exp_path = arg
+        bundle = get_pseudo2d_data(exp_path, proc_num=proc_num)
+    else:
+        raise TypeError(
+            "The first argument of this function must be a string of the path to the "
+            "experiment folder containing the pseudo-2D NMR data or a dictionary"
+            "containing the data to be plot."
+        )
+
+    x_vals = bundle["x_vals_ppm"]
+    y_data = bundle["y_data"]
+    nucleus = bundle["nucleus"]
+
+    fig, ax = plt.subplots()
+    ax.plot(x_vals, y_data[slice_idx])
+
+    ax.invert_xaxis()
+    ax.set_xlabel(nucleus_label(nucleus))
+    ax.set_ylabel("Intensity / a.u.")
+    ax.set_yticks([])
+
+    if f2l or f2r:
+        if f2l < f2r:
+            ax.xlim(f2r, f2l)
+        else:
+            ax.xlim(f2l, f2r)
+
+    fig.tight_layout()
+    if save_path:
+        fig.savefig(save_path)
+
+    fig.set_figheight(plheight)
+    fig.set_figwidth(plwidth)
+
+    bundle["fig"] = fig
+    bundle["ax"] = ax
+
+    return bundle
+
+
+def sim_diffusion(
+    nuclide, little_delta=1, big_delta=20, max_gradient=17, diff_coeff=None
+):
+    """
+    Simulate and plot the attenuation curve of a diffusion experiment.
+
+    This function is meant to help estimate appropriate parameters for your experiment
+    but you should still run test experiments on your spectrometer!
+
+    nuclide: String of the format {mass number}{symbol}, e.g. '1H' or '27Al'.
+    little_delta: Length of each gradient pulse in [ms].
+    big_delta: diff_coeffiffusion time, measured between the starting times of the two
+               gradient pulses in [ms].
+    max_gradient: The maximum gradient strength in T/m? or G/cm?
+    diff_coeff: Diffusion coefficient(s) to simulate, in [m^2/s]. If unspecified, this
+                will default to a logscale range of 1e-7 to 1e-15 m^2/s.
+    """
+
+    # convert ms to s
+    little_delta = little_delta / 1000
+    big_delta = big_delta / 1000
+
+    if diff_coeff is None:
+        diff_coeff = np.logspace(-8, -15, 8)
+
+    multiple = False
+    if isinstance(
+        diff_coeff, list
+    ):  # TOdiff_coeffO: Accept arrays as well as lists, check iterable
+        multiple = len(diff_coeff) > 1
+        if not multiple:
+            diff_coeff = diff_coeff[0]
+
+    gamma = find_gamma(nuclide)  # [MHz/T]
+
+    # CHECK: Is this a sensible range?
+    gradient_vals = np.arange(0, max_gradient * 1.01, max_gradient / 99.0)
+    exponent_coefficient_list = [  #: CHECK Why is there a 2pi factor?
+        (2 * np.pi * gamma * little_delta * gradient) ** 2
+        * (big_delta - (little_delta / 3))
+        for gradient in gradient_vals
+    ]
+
+    # TODO: Refactor sim_diffusion so its not so big and requiring a huge if
+    #       Start by making diff_coeff into a list even if len == 1
+    fig, ax = plt.subplots()
+    if multiple:
+        intensity_data = np.zeros(shape=(len(diff_coeff), len(gradient_vals)))
+        cnt = 0
+        for j in diff_coeff:
+            intensity_data[cnt] = np.exp(np.multiply(-j, exponent_coefficient_list))
+            cnt += 1
+
+        colmap = cm.seismic(np.linspace(0, 1, len(diff_coeff)))
+        for k, c in zip(range(len(diff_coeff)), colmap):
+            plt.plot(
+                gradient_vals,
+                intensity_data[k, :],
+                color=c,
+                linewidth=2,
+                label=str(diff_coeff[k]) + r" $\mathregular{m^2 s^{–1}}$",
+            )
+    else:
+        intensity_data = np.exp(np.multiply(-diff_coeff, exponent_coefficient_list))
+
+        plt.plot(
+            gradient_vals,
+            intensity_data,
+            linewidth=2,
+            color="r",
+            label=str(diff_coeff) + r" $\mathregular{m^2 s^{–1}}$",
+        )
+    ax.set_xlim(0, max_gradient * 1.25)
+    plt.legend(loc="upper right", frameon=False)
+    plt.xlabel(r"Gradient Strength, g / $\mathregular{T m^{–1}}$")
+    plt.ylabel(r"Intensity, $\mathregular{I/I_0}$")
+
+    bundle = {
+        "fig": fig,
+        "ax": ax,
+        "nuclide": nuclide,
+        "gamma": gamma,
+        "diff_coeff": diff_coeff,
+        "little_delta": little_delta,
+        "big_delta": big_delta,
+        "gradient_vals": gradient_vals,
+        "intensity_data": intensity_data,
+    }
+
+    return bundle
+
+
+def plot_t2_relaxation(peak_ints_norm, L1, L2, CNST31):
+    """
+    T2 plotting function, uses data read from the xf2 function
+    T2_plot(peak_ints_norm, L1, CNST31)
+
+    TODO: Wrap T2_plot so user can provide just exp_path
+    """
+
+    echo_delay = np.arange(
+        (2 * L1 / CNST31),
+        (2 * ((L1) + (L2 * (len(peak_ints_norm[:, 0])))) / CNST31),
+        2 * L2 / CNST31,
+    )
+    echo_delay *= 1000  # unit = ms
+
+    _, ax = plt.subplots()
+    plt.plot(echo_delay, peak_ints_norm)
+    ax.set_xlabel("Echo delay / ms")
+    ax.set_ylabel("Normalized Intensity")
+
+
+def diff_plot(peak_ints_norm, exp_path):
+    """
+    Diffusion plotting function, uses data read from the xf2 function
+    G, grad_params = diff_plot(peak_ints_norm, datapath, NUC)
+
+    TODO: Add data getting to diff_plot so peak_ints_norm is not needed
+    """
+
+    bundle = get_diff_params(exp_path)
+
+    _, ax = plt.subplots()
+    plt.plot(
+        bundle["gradient_list"], peak_ints_norm, "o"
+    )  # , c='red', mfc='blue', mec='blue')
+    ax.set_xlabel(r"Gradient Strength / G cm$\mathregular{^{-1}}$")
+    ax.set_ylabel("Normalized Intensity")
 
     return bundle
