@@ -73,16 +73,18 @@ def get_data_from_folder(dir_path, exp_nums):
             if os.path.isdir(os.path.join(dir_path, item)) and item.isnumeric()
         ]
 
+    x_vals_list = []
     bundle = {}
     for exp_num in exp_nums:
         exp_path = os.path.join(dir_path, str(exp_num))
-        bundle[f"exp_{exp_num}"] = get_1d_data(exp_path)
+        exp_bundle = get_1d_data(exp_path)
+        x_vals_list.append(exp_bundle["x_vals_ppm"])
+        bundle[f"exp_{exp_num}"] = exp_bundle
 
-    # If all experiments have the same set of x vals, specify add a key to the bundle
-    # with that set
-    all_x_vals_ppm = set([exp_bundle["x_vals_ppm"] for _, exp_bundle in bundle.items()])
-    if len(all_x_vals_ppm) == 1:
-        bundle["x_vals_ppm"] = next(iter(bundle))["x_vals_ppm"]
+    # If all exps have the same set of x vals, add a key to the bundle with that set
+    first_x_vals = x_vals_list[0]
+    if all([(x_vals_ppm == first_x_vals).all() for x_vals_ppm in x_vals_list]):
+        bundle["x_vals_ppm"] = first_x_vals
 
     return bundle
 
