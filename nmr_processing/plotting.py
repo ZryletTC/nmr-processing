@@ -236,7 +236,50 @@ def plot_folder(
     return bundle
 
 
-def plot_2d(
+def add_projections(ax, *, x, y, z):
+    """
+    Add top and left projection axes to a 2D contour plot.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        Main contour plot axis.
+    x : array-like
+        F2 axis values for the top projection.
+    y : array-like
+        F1 axis values for the left projection.
+    z : array-like
+        2D intensity matrix used to compute projection traces.
+    """
+
+    ax.yaxis.set_label_position("right")
+    ax.yaxis.tick_right()
+    ax.tick_params(pad=6)
+
+    divider = make_axes_locatable(ax)
+    ax_f2 = divider.append_axes("top", 2, pad=0.1, sharex=ax)
+    ax_f1 = divider.append_axes("left", 2, pad=0.1, sharey=ax)
+    ax_f2.plot(x, z.sum(axis=0), "k")
+    ax_f1.plot(-z.sum(axis=1), y, "k")
+
+    # make projection axes invisible
+    ax_f2.tick_params(axis="both", which="both", bottom=False, left=False)
+    ax_f1.tick_params(axis="both", which="both", bottom=False, left=False)
+    ax_f2.xaxis.set_tick_params(labelbottom=False)
+    ax_f1.yaxis.set_tick_params(labelleft=False)
+    ax_f2.spines["left"].set_visible(False)
+    ax_f2.spines["right"].set_visible(False)
+    ax_f2.spines["bottom"].set_visible(False)
+    ax_f2.spines["top"].set_visible(False)
+    ax_f1.spines["left"].set_visible(False)
+    ax_f1.spines["right"].set_visible(False)
+    ax_f1.spines["bottom"].set_visible(False)
+    ax_f1.spines["top"].set_visible(False)
+    ax_f2.yaxis.set_ticklabels([])
+    ax_f1.xaxis.set_ticklabels([])
+
+
+def plot_2d(  # pylint: disable=too-many-statements
     arg,
     *,
     proc_num=1,
@@ -287,6 +330,7 @@ def plot_2d(
         Data bundle updated with `fig` and `ax` objects.
 
     CHECK: Does this work with psuedo-2D data?
+    TODO: Remove duplicate cropping code from plot_2d
     """
 
     if isinstance(arg, dict):
@@ -384,31 +428,7 @@ def plot_2d(
     ax.invert_yaxis()
 
     if show_projections:
-        ax.yaxis.set_label_position("right")
-        ax.yaxis.tick_right()
-        ax.tick_params(pad=6)
-
-        divider = make_axes_locatable(ax)
-        ax_f2 = divider.append_axes("top", 2, pad=0.1, sharex=ax)
-        ax_f1 = divider.append_axes("left", 2, pad=0.1, sharey=ax)
-        ax_f2.plot(x, z.sum(axis=0), "k")
-        ax_f1.plot(-z.sum(axis=1), y, "k")
-
-        # make projection axes invisible
-        ax_f2.tick_params(axis="both", which="both", bottom=False, left=False)
-        ax_f1.tick_params(axis="both", which="both", bottom=False, left=False)
-        ax_f2.xaxis.set_tick_params(labelbottom=False)
-        ax_f1.yaxis.set_tick_params(labelleft=False)
-        ax_f2.spines["left"].set_visible(False)
-        ax_f2.spines["right"].set_visible(False)
-        ax_f2.spines["bottom"].set_visible(False)
-        ax_f2.spines["top"].set_visible(False)
-        ax_f1.spines["left"].set_visible(False)
-        ax_f1.spines["right"].set_visible(False)
-        ax_f1.spines["bottom"].set_visible(False)
-        ax_f1.spines["top"].set_visible(False)
-        ax_f2.yaxis.set_ticklabels([])
-        ax_f1.xaxis.set_ticklabels([])
+        add_projections(ax, x=x, y=y, z=z)
 
     fig.set_figheight(plheight)
     fig.set_figwidth(plwidth)
@@ -545,7 +565,7 @@ def sim_diffusion(
     multiple = False
     if isinstance(
         diff_coeff, list
-    ):  # TOdiff_coeffO: Accept arrays as well as lists, check iterable
+    ):  # TODO: Accept arrays as well as lists, check iterable
         multiple = len(diff_coeff) > 1
         if not multiple:
             diff_coeff = diff_coeff[0]
