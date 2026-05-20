@@ -556,7 +556,6 @@ def plot_t2_relaxation(peak_ints_norm, l1, l2, cnst31):
 def diff_plot(peak_ints_norm, exp_path):
     """
     Diffusion plotting function, uses data read from the xf2 function
-    G, grad_params = diff_plot(peak_ints_norm, datapath, NUC)
 
     TODO: Add data getting to diff_plot so peak_ints_norm is not needed
     """

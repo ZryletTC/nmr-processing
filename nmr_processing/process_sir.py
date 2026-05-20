@@ -417,9 +417,7 @@ def plot_cifit_csv(
         with open(outpath, "r", encoding="utf-8") as f:
             outtext = f.read()
         outtext = outtext[outtext.find("Final") :]
-        # print(outtext)
-        # TODO: Check if regex still work with double quotes and raw string
-        match = re.search('No. \d+=\s*([\.\d]+)\nChi', outtext)  # fmt: skip # noqa
+        match = re.search(r"No. \d+=\s*([\.\d]+)\nChi", outtext)
         # print(match)
         if match:
             rate = match.group(1)
@@ -453,6 +451,11 @@ def plot_cifit_csv(
 # Functions from leonmr:
 ########################
 def get_1d_exsy_data(dir_path, exp_nums):
+    """
+    This function usually fails because the x values are changed between experiments.
+    Not sure if this function is even useful though. Looks like lots of overlap with
+    other functions. Maybe just delete.
+    """
     d15_vals = []
     for exp_num in exp_nums:
         exp_path = os.path.join(dir_path, str(exp_num))
