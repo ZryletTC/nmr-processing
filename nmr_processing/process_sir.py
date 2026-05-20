@@ -5,6 +5,7 @@ This module includes helpers for reading T1 intensity files and variable delay l
 used in SIR/T1 relaxation experiments.
 
 TODO: Reorganize between process_sir.py and sirtools
+TODO: Add plotting back into sir functions
 """
 
 import os
@@ -158,8 +159,8 @@ def make_cifit_files(
     tp2=False,
     k_guesses=None,
     matrix=None,
-    M_0_guesses=None,
-    M_f_guesses=None,
+    initial_mag_guesses=None,
+    final_mag_guesses=None,
 ):
     make_dat_file(
         filename, delays=delays, intensities=intensities, title=title, names=names
@@ -167,17 +168,17 @@ def make_cifit_files(
 
     intensities = np.array(intensities)
 
-    if not M_0_guesses:
-        M_0_guesses = list(intensities[0])
-    if not M_f_guesses:
-        M_f_guesses = list(intensities[-1])
+    if not initial_mag_guesses:
+        initial_mag_guesses = list(intensities[0])
+    if not final_mag_guesses:
+        final_mag_guesses = list(intensities[-1])
 
     make_mch_file(
         filename,
         title=title,
         sites=intensities.shape[1],
-        M_0_guesses=M_0_guesses,
-        M_f_guesses=M_f_guesses,
+        initial_mag_guesses=initial_mag_guesses,
+        final_mag_guesses=final_mag_guesses,
         r1_guesses=r1_guesses,
         tp2=tp2,
         k_guesses=k_guesses,
@@ -191,8 +192,8 @@ def make_mch_file(
     processes=1,
     r1_guesses=None,
     k_guesses=None,
-    M_f_guesses=None,
-    M_0_guesses=None,
+    final_mag_guesses=None,
+    initial_mag_guesses=None,
     matrix=None,
     title="TEST",
     tp2=False,
@@ -234,22 +235,22 @@ def make_mch_file(
     if tp2:
         mch_lines.append(" ".join(map(str, np.ones(sites, dtype=np.int8))))
 
-    if M_f_guesses:
-        if len(M_f_guesses) != sites:
-            raise ValueError("`M_f_guesses` must be of length `sites`!")
+    if final_mag_guesses:
+        if len(final_mag_guesses) != sites:
+            raise ValueError("`final_mag_guesses` must be of length `sites`!")
     else:
-        M_f_guesses = np.ones(sites)  # Final intensities are normalized, so 1
-    mch_lines.extend(["", " ".join(map(str, M_f_guesses))])
+        final_mag_guesses = np.ones(sites)  # Final intensities are normalized, so 1
+    mch_lines.extend(["", " ".join(map(str, final_mag_guesses))])
     if tp2:
         mch_lines.append(" ".join(map(str, np.ones(sites, dtype=np.int8))))
 
-    if M_0_guesses:
-        if len(M_0_guesses) != sites:
-            raise ValueError("`M_0_guesses` must be of length `sites`!")
+    if initial_mag_guesses:
+        if len(initial_mag_guesses) != sites:
+            raise ValueError("`initial_mag_guesses` must be of length `sites`!")
     else:
         # This is a bad guess, it should be more like 1, -1
-        M_0_guesses = np.ones(sites)
-    mch_lines.extend(["", " ".join(map(str, M_0_guesses))])
+        initial_mag_guesses = np.ones(sites)
+    mch_lines.extend(["", " ".join(map(str, initial_mag_guesses))])
     if tp2:
         mch_lines.append(" ".join(map(str, np.ones(sites, dtype=np.int8))))
 
@@ -320,11 +321,16 @@ def exp_to_cifit(
     tp2=False,
     k_guesses=None,
     matrix=None,
-    M_0_guesses=None,
-    M_f_guesses=None,
+    initial_mag_guesses=None,
+    final_mag_guesses=None,
     ints=True,
 ):
-    # Add plotting back into sir functions
+    """
+    Example:
+    exp_path = ('/Users/tylerpennebaker/BoxSync/wp6_exsy/EXSYstudy/'
+                '500.TP-2024.10.31_7Li_LZC+LPSC/219')
+    exp_to_cifit(exp_path, 'test', peak_pos=[1.46, -0.92])
+    """
 
     if ints:
         t1ints = os.path.join(exp_path, f"pdata/{proc_num}/t1ints.txt")
@@ -360,8 +366,8 @@ def exp_to_cifit(
         tp2=tp2,
         k_guesses=k_guesses,
         matrix=matrix,
-        M_0_guesses=M_0_guesses,
-        M_f_guesses=M_f_guesses,
+        initial_mag_guesses=initial_mag_guesses,
+        final_mag_guesses=final_mag_guesses,
     )
 
 
@@ -441,10 +447,6 @@ def plot_cifit_csv(
         savepath = filepath.replace(".csv", ".pdf")
     plt.savefig(savepath)
     plt.show()
-
-
-# exp_path = '/Users/tylerpennebaker/BoxSync/wp6_exsy/EXSYstudy/500.TP-2024.10.31_7Li_LZC+LPSC/219'  # noqa
-# exp_to_cifit(exp_path, 'test', peak_pos=[1.46, -0.92])
 
 
 ########################
