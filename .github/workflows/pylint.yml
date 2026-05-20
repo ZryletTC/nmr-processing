@@ -5,10 +5,12 @@ on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
-    continue-on-error: true
+    continue-on-error: ${{ matrix.experimental }}
     strategy:
+      fail-fast: true
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
+        experimental: [false]
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
