@@ -14,11 +14,21 @@ from scipy import signal
 
 def get_1d_data(exp_path, proc_num=1, include_md=False):
     """
-    Get 1D NMR data from raw Bruker files. Returns a dictionary bundling the data.
+    Read 1D NMR data from raw Bruker experiment files.
 
-    exp_path: Top-level experiment folder containing the 2D NMR data.
-    proc_num: Process number of data to be plotted (default = 1).
-    include_md: If true, include procs and acqus dictionaries in the output bundle.
+    Parameters
+    ----------
+    exp_path : str
+        Path to the Bruker experiment directory.
+    proc_num : int, default: 1
+        Processing number containing the 1D dataset.
+    include_md : bool, default: False
+        If True, include raw Bruker metadata in the returned bundle.
+
+    Returns
+    -------
+    dict
+        Bundle containing x/y axis values, nucleus label, and intensity data.
     """
 
     pdata_path = os.path.join(exp_path, "pdata", str(proc_num))
@@ -54,12 +64,21 @@ def get_1d_data(exp_path, proc_num=1, include_md=False):
     return bundle
 
 
-def get_data_from_folder(dir_path, exp_nums):
+def get_data_from_folder(dir_path, exp_nums=None):
     """
-    Function to read in 1D NMR data from a folder of raw Bruker files.
+    Load a set of 1D Bruker experiments from a directory.
 
-    dir_path: Data directory containing 1D-NMR experiment folders.
-    exp_nums: List of experiment numbers (e.g., [1, 5, 6, 10]).
+    Parameters
+    ----------
+    dir_path : str
+        Directory containing numbered experiment subfolders.
+    exp_nums : list of int, optional
+        List of experiment numbers to load. If None, all numeric subfolders are loaded.
+
+    Returns
+    -------
+    dict
+        Bundle containing experiment data dictionaries indexed by experiment name.
 
     TODO: Add normalization option to get_data_from_folder
     TODO: Check data dimensionality in get_data_from_folder
@@ -91,10 +110,19 @@ def get_data_from_folder(dir_path, exp_nums):
 
 def get_2d_data(exp_path, proc_num=1):
     """
-    Get 2D NMR data from raw Bruker files.
+    Read 2D NMR data from raw Bruker files.
 
-    exp_path: Top-level experiment folder containing the 2D NMR data.
-    proc_num: Process number of data to be plotted (default = 1).
+    Parameters
+    ----------
+    exp_path : str
+        Path to the experiment directory.
+    proc_num : int, default: 1
+        Processing number containing the 2D dataset.
+
+    Returns
+    -------
+    dict
+        Bundle containing axis values and the 2D intensity array.
     """
 
     pdata_path = os.path.join(exp_path, "pdata", str(proc_num))
@@ -138,12 +166,19 @@ def get_diff_params(exp_path):
     """
     Extract diffusion experiment parameters from a diff.xml file.
 
-    Returns the following values in a bundle dict:
-        little_delta: Length of each gradient pulse in [ms].
-        big_delta: Diffusion time, measured between the starting times of the two
-                   gradient pulses in [ms].
-        diff_coeff_estimate: The estimated diffusion coefficient in [m^2/s].
-        gradient_list: List of gradient strengths in [G/cm].
+    Parameters
+    ----------
+    exp_path : str
+        Path to the experiment directory containing the diff.xml.
+
+    Returns
+    -------
+    dict
+        Dictionary containing:
+        - little_delta: gradient pulse length in seconds.
+        - big_delta: diffusion time in seconds.
+        - diff_coeff_estimate: estimated diffusion coefficient in m^2/s.
+        - gradient_list: list of gradient field strengths in G/cm.
     """
 
     xml_path = os.path.join(exp_path, "diff.xml")
@@ -182,10 +217,19 @@ def get_diff_params(exp_path):
 
 def get_pseudo2d_data(exp_path, proc_num=1):
     """
-    Get pseudo-2D NMR data from raw Bruker files.
+    Read pseudo-2D NMR data from raw Bruker files.
 
-    exp_path: Top-level experiment folder containing the pseudo-2D NMR data.
-    proc_num: Process number of data to be plotted (default = 1).
+    Parameters
+    ----------
+    exp_path : str
+        Path to the experiment directory.
+    proc_num : int, default: 1
+        Processing number containing the pseudo-2D dataset.
+
+    Returns
+    -------
+    dict
+        Bundle containing x axis values, intensity data, and metadata.
     """
 
     pdata_path = os.path.join(exp_path, "pdata", str(proc_num))
@@ -226,15 +270,27 @@ def get_peak_slice_intensities(
     prominence=None,
 ):
     """
-    Find the intensities of peaks across slices in a pseudo-2d experiment. Peak
+    Extract peak intensities from each slice of a pseudo-2D dataset. Peak
     intensities are normalized by the slice with the largest total intensity.
 
-    y_data: 2D intensity data, where each row is a slice/1D spectrum.
-    x_vals_ppm: Corresponding ppm values for intensity data.
-    peak_pos: Position(s) in ppm to get the intensities for. If None (default), peak
-              positions will be found automatically using scipy.signal.find_peaks.
-    prominence: Range of prominence values to allow during automatic peak picking.
-                Default is [0.001, 1]. Refer to `scipy.signal.find_peaks` for more info.
+    Parameters
+    ----------
+    x_vals_ppm : array-like
+        X-axis values in ppm.
+    y_data : array-like
+        2D intensity data where each row is a slice/1D spectrum.
+    peak_pos : array-like, optional
+        Position(s) in ppm of peaks to extract. If None, peaks are automatically
+        detected automatically using `scipy.signal.find_peaks`.
+    prominence : tuple or list, default: [0.001, 1]
+        Prominence range passed to `scipy.signal.find_peaks` when peaks are
+        auto-detected.
+
+    Returns
+    -------
+    dict
+        Bundle containing peak indices, ppm positions, raw intensities, and normalized
+        intensities.
 
     TODO: add bundle input to get_peak_slice_intensities
     TODO: allow no xdata input to get_peak_slice_intensities

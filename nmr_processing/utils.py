@@ -173,7 +173,17 @@ NMR_NUCLEI_LIST = [
 
 def nucleus_label(nucleus):
     """
-    Determine and format the x axis label for a plot depending on the nucleus.
+    Generate a formatted label for the x-axis of an NMR spectrum with a given nucleus.
+
+    Parameters
+    ----------
+    nucleus : str
+        Nuclide label in the form '{mass number}{symbol}', for example '1H' or '27Al'.
+
+    Returns
+    -------
+    str
+        Formatted axis label for use in NMR plots.
     """
 
     # Determine axis label values
@@ -194,9 +204,17 @@ def nucleus_label(nucleus):
 
 def find_gamma(nuclide):
     """
-    Return the gyromagnetic_ratio (gamma) of a given nuclide.
+    Return the gyromagnetic ratio (gamma) of a given nuclide.
 
-    nuclide: String of the format {mass number}{symbol}, e.g. '1H' or '27Al'.
+    Parameters
+    ----------
+    nuclide : str
+        Nuclide label in the form '{mass number}{symbol}', for example '1H' or '27Al'.
+
+    Returns
+    -------
+    float
+        Gyromagnetic ratio in radians per tesla per second.
     """
 
     df = pd.DataFrame(NMR_NUCLEI_LIST)

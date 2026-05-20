@@ -6,6 +6,7 @@ used in SIR/T1 relaxation experiments.
 
 TODO: Reorganize between process_sir.py and sirtools
 TODO: Add plotting back into sir functions
+TODO: Add better documentation for matrix math
 """
 
 import os
@@ -28,6 +29,29 @@ from nmr_processing.processing import (
 
 
 def read_t1ints(exp_path, proc_num=1, delay_offset=True, normalize=True):
+    """
+    Read T1 intensity data from the Topspin-generated `t1ints.txt` file.
+
+    Parameters
+    ----------
+    exp_path : str
+        Path to the experiment directory.
+    proc_num : int, default: 1
+        Processing number containing the `t1ints.txt` file.
+    delay_offset : bool, default: True
+        If True, include half of the p1 and p2 pulse lengths in delay values.
+    normalize : bool, default: True
+        If True, normalize intensities by the maximum value.
+
+    Returns
+    -------
+    times : np.ndarray
+        Delay times used in the experiment in seconds.
+    ints : np.ndarray
+        Intensity data with num_time_points rows and num_peaks columns.
+    positions : list
+        Peak positions in ppm.
+    """
 
     t1ints_path = os.path.join(exp_path, "pdata", str(proc_num), "t1ints.txt")
 
@@ -74,6 +98,21 @@ def load_vdlist(
     exp_path,
     delay_offset=True,
 ):
+    """
+    Load a Bruker variable delay list (VDLIST) and convert values to seconds.
+
+    Parameters
+    ----------
+    exp_path : str
+        Path to the experiment directory containing the `vdlist` file.
+    delay_offset : bool, default: True
+        If True, include half of the p1 and p2 pulse lengths in delay values.
+
+    Returns
+    -------
+    np.ndarray
+        Array of delay times in seconds.
+    """
 
     vdlist_path = os.path.join(exp_path, "vdlist")
 
@@ -112,14 +151,39 @@ def process_sir(
     exp_path,
     proc_num=1,
     peak_pos=None,
-    delay_offset=True,
     regions=None,
+    delay_offset=True,
 ):
     """
-    Process a Selective Inversion Recovery experiment.
-    Pass in the path to the experiment and this returns the data.
+    Read the delay and intensity data from a Selective Inversion Recovery experiment.
 
-    Also works for T1 measurements or other pseudo-2D exps that use vdlist.
+    This function has three methods for determining peak intensities, listed in order of
+    decreasing priority:
+    1. Intensities extracted at the provided `peak_pos` values.
+    2. Integrated intensities over the provided `regions`.
+    3. Intensities extracted at the automatically-found positions of peaks.
+
+    This function should also theoretically work for T1 measurements or other pseudo-2D
+    experiments that use vdlists, but this is not tested.
+
+    Parameters
+    ----------
+    exp_path : str
+        Path to the experiment directory.
+    proc_num : int, default: 1
+        Processing number containing the processed data.
+    peak_pos : array-like, optional
+        Peak positions in ppm used to extract intensities.
+    regions : list of tuple, optional
+        List of ppm ranges to integrate across to determine peak intensities.
+    delay_offset : bool, default: True
+        If True, include half of the p1 and p2 pulse lengths in delay values.
+
+    Returns
+    -------
+    tuple
+        (delays, intensities) where `delays` are the experimental delays and
+        `intensities` are extracted intensity values for the selected peaks.
     """
 
     # Load vdlist and interpret suffixes
@@ -154,16 +218,56 @@ def make_cifit_files(
     delays,
     intensities,
     title=None,
-    names=None,
+    peak_names=None,
     r1_guesses=None,
-    tp2=False,
     k_guesses=None,
-    matrix=None,
     initial_mag_guesses=None,
     final_mag_guesses=None,
+    matrix=None,
+    tp2=False,
 ):
+    """
+    Create CIFIT (`.dat` and `.mch`) input files from delay/intensity data.
+
+    Parameters
+    ----------
+    filename : str
+        Base filename for output files (without extension).
+    delays : array-like
+        Delay times in seconds.
+    intensities : array-like
+        Intensity values for each site at each time point. This must have n_time_points
+        rows and n_sites columns.
+    title : str, optional
+        Title written to the header of output files.
+    peak_names : list of str, optional
+        Peak names to include in the `.dat` comment header.
+    r1_guesses : list of float, optional
+        Initial guess of R1 relaxation rates in Hz for each site. The default guesses
+        are values measured for LPSC and LZC.
+    k_guesses : list of float, optional
+        Initial guess of the rate constant in Hz for each exchange process. The default
+        guess for each process is 1 Hz, which is not likely to be a great guess.
+    initial_mag_guesses : list of float, optional
+        Initial guess of the initial magnetization for each site. Defaults to the first
+        intensity values.
+    final_mag_guesses : list of float, optional
+        Initial guess of the final magnetization for each site. Defaults to the last
+        intensity values.
+    matrix : array-like, optional
+        2D matrix describing off-diagonal contributions to exchange matrix. By default,
+        this assumes all sites participate in exchange and have equal populations.
+    tp2 : bool, default: False
+        If True, write TP2-style mechanism parameters. Otherwise, write file according
+        to Bain as defined in his cifman.pdf.
+    """
+
     make_dat_file(
-        filename, delays=delays, intensities=intensities, title=title, names=names
+        filename,
+        delays=delays,
+        intensities=intensities,
+        title=title,
+        peak_names=peak_names,
     )
 
     intensities = np.array(intensities)
@@ -192,20 +296,49 @@ def make_mch_file(
     processes=1,
     r1_guesses=None,
     k_guesses=None,
-    final_mag_guesses=None,
     initial_mag_guesses=None,
+    final_mag_guesses=None,
     matrix=None,
     title="TEST",
     tp2=False,
 ):
     """
-    Make .mch file describing the mechanism for CIFIT fitting,
+    Write a CIFIT mechanism (.mch) file describing the relaxation mechanism.
 
     tp2 hard codes varying rate and M0 but keeping M_inf and T1s constant,
     for use with cifit2.1 aka cifit2 aka cifit_tp2
-
     TODO: Rename tp2
+
+    Parameters
+    ----------
+    filename : str
+        Base filename for the output file (without extension).
+    sites : int, default: 2
+        Number of sites being analyzed.
+    processes : int, default: 1
+        Number of exchange processes.
+    r1_guesses : list of float, optional
+        Initial guess of R1 relaxation rates in Hz for each site. The default guesses
+        are values measured for LPSC and LZC.
+    k_guesses : list of float, optional
+        Initial guess of the rate constant in Hz for each exchange process. The default
+        guess for each process is 1 Hz, which is not likely to be a great guess.
+    initial_mag_guesses : list of float, optional
+        Initial guess of the initial magnetization for each site. Defaults to 1 for all
+        sites, which is a bad guess. Please provide a better guess.
+    final_mag_guesses : list of float, optional
+        Initial guess of the final magnetization for each site. Defaults to 1 to match
+        normalized intensities.
+    matrix : array-like, optional
+        2D matrix describing off-diagonal contributions to exchange matrix. By default,
+        this assumes all sites participate in exchange and have equal populations.
+    title : str, default: "TEST"
+        Title written to the header of the .mch file.
+    tp2 : bool, default: False
+        If True, write TP2-style mechanism parameters. Otherwise, write file according
+        to Bain as defined in his cifman.pdf.
     """
+
     if matrix:
         matrix = np.array(matrix)
         if matrix.shape != (sites, sites):
@@ -248,7 +381,7 @@ def make_mch_file(
         if len(initial_mag_guesses) != sites:
             raise ValueError("`initial_mag_guesses` must be of length `sites`!")
     else:
-        # This is a bad guess, it should be more like 1, -1
+        # FIXME: This is a bad guess, it should be more like 1, -1
         initial_mag_guesses = np.ones(sites)
     mch_lines.extend(["", " ".join(map(str, initial_mag_guesses))])
     if tp2:
@@ -278,7 +411,24 @@ def make_mch_file(
         file.writelines(s + "\n" for s in mch_lines)
 
 
-def make_dat_file(filename, delays, intensities, title="TEST", names=None):
+def make_dat_file(filename, delays, intensities, title="TEST", peak_names=None):
+    """
+    Write a CIFIT `.dat` file containing delay and intensity data.
+
+    Parameters
+    ----------
+    filename : str
+        Basename for the output file (without extension).
+    delays : array-like
+        Delay times in seconds.
+    intensities : array-like
+        Intensities corresponding to each delay.
+    title : str, optional
+        File title line, by default "TEST".
+    peak_names : list of str, optional
+        peak_names for each intensity column.
+    """
+
     data_lines = [title]
 
     numpoints = len(delays)
@@ -288,10 +438,12 @@ def make_dat_file(filename, delays, intensities, title="TEST", names=None):
 
     data_lines.extend(["", str(numpoints), ""])
 
-    if names:
-        if not isinstance(names, (list, np.ndarray)):
-            raise TypeError("names parameter must be of type `list` or `ndarray`")
-        comment = "# Tmix, " + ", ".join(map(str, names))
+    if peak_names:
+        if not isinstance(peak_names, (list, np.ndarray)):
+            raise TypeError(
+                "`peak_names` parameter must be of type `list` or `ndarray`"
+            )
+        comment = "# Tmix, " + ", ".join(map(str, peak_names))
     else:
         comment = "# Tmix, intensities..."
     data_lines.append(comment)
@@ -313,30 +465,72 @@ def make_dat_file(filename, delays, intensities, title="TEST", names=None):
 
 def exp_to_cifit(
     exp_path,
-    outfile=None,
+    filename=None,
     proc_num=1,
     peak_pos=None,
     peak_names=None,
-    t1_values=None,
-    tp2=False,
+    t1_guesses=None,
     k_guesses=None,
-    matrix=None,
     initial_mag_guesses=None,
     final_mag_guesses=None,
-    ints=True,
+    matrix=None,
+    use_t1ints=True,
+    tp2=False,
 ):
     """
-    Example:
-    exp_path = ('/Users/tylerpennebaker/BoxSync/wp6_exsy/EXSYstudy/'
-                '500.TP-2024.10.31_7Li_LZC+LPSC/219')
-    exp_to_cifit(exp_path, 'test', peak_pos=[1.46, -0.92])
+    Convert a T1/SIR experiment directly from Bruker data files into CIFIT input files.
+
+    Writes CIFIT `.dat` and `.mch` files to disk.
+
+    Parameters
+    ----------
+    exp_path : str
+        Path to the experiment directory.
+    filename : str, optional
+        Base filename for CIFIT files. By default, the files will be created with
+        basenames matching the experiment number (e.g., 12.mch and 12.dat)
+    proc_num : int, default: 1
+        Processing number containing the processed data.
+    peak_pos : list of float, optional
+        Peak positions in ppm used for intensity extraction if no `t1ints.txt` file
+        is present.
+    peak_names : list of str, optional
+        Labels for each peak.
+    t1_guesses : list of float, optional
+        Initial guess of T1 relaxation times in seconds for each site. The default
+        guesses are values measured for LPSC and LZC.
+    k_guesses : list of float, optional
+        Initial guess of the rate constant in Hz for each exchange process. The default
+        guess for each process is 1 Hz, which is not likely to be a great guess.
+    initial_mag_guesses : list of float, optional
+        Initial guess of the initial magnetization for each site. Defaults to the first
+        intensity values.
+    final_mag_guesses : list of float, optional
+        Initial guess of the final magnetization for each site. Defaults to the last
+        intensity values.
+    matrix : array-like, optional
+        2D matrix describing off-diagonal contributions to exchange matrix. By default,
+        this assumes all sites participate in exchange and have equal populations.
+    use_t1ints : bool, default: True
+        If True, read data from `t1ints.txt`. Otherwise, extract intensities from
+        processed pseudo-2D data in Bruker files.
+    tp2 : bool, default: False
+        If True, write TP2-style mechanism parameters. Otherwise, write file according
+        to Bain as defined in his cifman.pdf.
+
+    Examples
+    --------
+    >>> exp_path = ('/Users/tylerpennebaker/BoxSync/wp6_exsy/EXSYstudy/'
+    ...             '500.TP-2024.10.31_7Li_LZC+LPSC/219')
+    >>> exp_to_cifit(exp_path, 'test', peak_pos=[1.46, -0.92])
     """
 
-    if ints:
-        t1ints = os.path.join(exp_path, f"pdata/{proc_num}/t1ints.txt")
-        delays, ints, positions = read_t1ints(t1ints)
+    if use_t1ints:
+        delays, intensities, positions = read_t1ints(exp_path)
     else:
-        delays, ints = process_sir(exp_path, proc_num=proc_num, peak_pos=peak_pos)
+        delays, intensities = process_sir(
+            exp_path, proc_num=proc_num, peak_pos=peak_pos
+        )
         positions = None
 
     exp_name = os.path.basename(os.path.dirname(exp_path))
@@ -349,19 +543,19 @@ def exp_to_cifit(
     else:
         peak_names = [f"{s:.2f} ppm" for s in positions]
 
-    if not t1_values:
-        t1_values = [0.462, 2.141]  # Example T1 values of LPSC and LZC in s
-    r1_guesses = [1 / t1 for t1 in t1_values]
+    if not t1_guesses:
+        t1_guesses = [0.462, 2.141]  # Example T1 values of LPSC and LZC in s
+    r1_guesses = [1 / t1 for t1 in t1_guesses]
 
-    if outfile is None:
-        outfile = exp_path
+    if filename is None:
+        filename = exp_path
 
     make_cifit_files(
-        outfile,
+        filename,
         delays,
-        ints,
+        intensities,
         title=title,
-        names=peak_names,
+        peak_names=peak_names,
         r1_guesses=r1_guesses,
         tp2=tp2,
         k_guesses=k_guesses,
@@ -372,12 +566,34 @@ def exp_to_cifit(
 
 
 def plot_cifit_csv(
-    filepath, nsites=2, names=None, data_rows=16, fit_rows=101, savepath=""
+    file_path, n_sites=2, site_names=None, data_rows=16, fit_rows=101, save_path=None
 ):
+    """
+    Plot CIFIT result data from the output CSV file.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to the CIFIT CSV file.
+    n_sites : int, default: 2
+        Number of sites analyzed.
+    site_names : list of str, optional
+        Labels for each site to display in plot legend.
+    n_data_rows : int, default: 16
+        Number of data rows to read from the CSV file.
+    fit_rows : int, default: 101
+        Number of smooth-fit rows to read from the CSV file.
+    save_path : str, optional
+        Output file path for the saved figure. If not specified, saves a PDF file with
+        the same basename as the CSV.
+
+    TODO: Autodetect n_sites from CSV shape in plot_cifit_csv
+    """
+
     cols = ["delay"]
-    cols.extend(map(str, range(nsites * 3)))
+    cols.extend(map(str, range(n_sites * 3)))
     data_df = pd.read_csv(
-        filepath,
+        file_path,
         sep=None,
         nrows=data_rows,
         skiprows=1,
@@ -389,9 +605,9 @@ def plot_cifit_csv(
     # print(data_df)
 
     cols = ["delay"]
-    cols.extend(map(str, range(nsites)))
+    cols.extend(map(str, range(n_sites)))
     fit_df = pd.read_csv(
-        filepath,
+        file_path,
         sep=None,
         nrows=fit_rows,
         skiprows=3 + data_rows,
@@ -403,22 +619,25 @@ def plot_cifit_csv(
     # print('FIT_DF')
     # print(fit_df)
 
-    if not names:
-        names = [f"Site {i+1}" for i in range(nsites)]
+    if not site_names:
+        site_names = [f"Site {i+1}" for i in range(n_sites)]
 
     _, ax = plt.subplots()
-    for i in range(nsites):
+    for i in range(n_sites):
         pts = ax.plot(
-            data_df["delay"], data_df[str(nsites + i)], ".", label=names[i] + " Data"
+            data_df["delay"],
+            data_df[str(n_sites + i)],
+            ".",
+            label=site_names[i] + " Data",
         )
         ax.plot(
             fit_df["delay"],
             fit_df[str(i)],
-            label=names[i] + " Calc",
+            label=site_names[i] + " Calc",
             color=pts[0].get_color(),
         )
 
-    outpath = filepath.replace(".csv", ".out")
+    outpath = file_path.replace(".csv", ".out")
     if os.path.exists(outpath):
         with open(outpath, "r", encoding="utf-8") as f:
             outtext = f.read()
@@ -443,9 +662,9 @@ def plot_cifit_csv(
     ax.legend()
 
     plt.tight_layout()
-    if not savepath:
-        savepath = filepath.replace(".csv", ".pdf")
-    plt.savefig(savepath)
+    if not save_path:
+        save_path = file_path.replace(".csv", ".pdf")
+    plt.savefig(save_path)
     plt.show()
 
 
@@ -454,10 +673,29 @@ def plot_cifit_csv(
 ########################
 def get_1d_exsy_data(dir_path, exp_nums):
     """
+    Extract 1D EXSY peak intensities from a directory of experiments.
+
+    Parameters
+    ----------
+    dir_path : str
+        Directory containing numbered experiment subfolders.
+    exp_nums : list of int
+        Experiment numbers to include in the analysis.
+
+    Returns
+    -------
+    d15_vals : np.ndarray
+        D15 delay values in seconds.
+    peak_ints_norm : np.ndarray
+        Normalized peak intensities off all experiments.
+
+    Notes
+    -----
     This function usually fails because the x values are changed between experiments.
     Not sure if this function is even useful though. Looks like lots of overlap with
     other functions. Maybe just delete.
     """
+
     d15_vals = []
     for exp_num in exp_nums:
         exp_path = os.path.join(dir_path, str(exp_num))
@@ -479,6 +717,26 @@ def get_1d_exsy_data(dir_path, exp_nums):
 
 
 def analyze_lpsc_1d_exsys(dir_path, exp_nums, plot=False):
+    """
+    Analyze LPSC 1D EXSY experiments by fitting two Pseudo-Voigt peaks.
+
+    Parameters
+    ----------
+    dir_path : str
+        Directory containing numbered experiment subfolders.
+    exp_nums : list of int
+        Experiment numbers to include in the analysis.
+    plot : bool, default: False
+        If True, plot the initial fit on the first experiment.
+
+    Returns
+    -------
+    d15_vals : np.ndarray
+        D15 delay values in seconds.
+    [p1_ints, p2_ints] : list of lists
+        Relative intensities of the two LPSC peaks across all experiments.
+    """
+
     first_path = os.path.join(dir_path, str(exp_nums[0]))
 
     if plot:
@@ -552,49 +810,75 @@ def analyze_lpsc_1d_exsys(dir_path, exp_nums, plot=False):
     return d15_vals, [p1_ints, p2_ints]
 
 
-def fit_1d_exsys(mixtimes, intensities, savename=None, fixed_t1=None, plot=True):
+def fit_1d_exsys(mixing_times, intensities, fixed_t1=None, plot=True, save_path=None):
+    """
+    Fit 1D EXSY exchange data to a simple kinetic decay model.
+
+    Parameters
+    ----------
+    mixing_times : array-like
+        Mixing times in seconds.
+    intensities : array-like
+        Normalized peak intensities corresponding to mixing times.
+    fixed_t1 : float, optional
+        If provided, set as the T1 parameter and fix the value during fitting.
+    plot : bool, default: True
+        If True, generate and return a plot of the fit.
+    save_path : str, optional
+        File path to save the fit plot, if plotting is enabled.
+
+    Returns
+    -------
+    lmfit.model.ModelResult or tuple
+        If plot is False, returns the fit result. If plot is True, returns
+        (fit_result, fig, ax), where fit_result is of type `lmfit.model.ModelResult`.
+    """
+
     default_k = 8
     default_t1 = 0.2
 
-    def exsy1dfit(x, k, t1):
+    def model_1d_exsy(x, k, t1):
         return np.multiply(
             np.exp(np.multiply(-1 / t1, x)),
             np.divide(1 + np.exp(np.multiply(2 * k, x)), 2),
         )
 
-    exsy_model = Model(exsy1dfit)
+    exsy_model = Model(model_1d_exsy)
     params = exsy_model.make_params(k=default_k, t1=default_t1)
-    if fixed_t1 is not None:
+    if fixed_t1:
         params["t1"].set(value=fixed_t1, vary=False)
-    fit_result = exsy_model.fit(intensities, params, x=mixtimes)
+    fit_result = exsy_model.fit(intensities, params, x=mixing_times)
     print(fit_result.fit_report())
 
-    # def exsy1dfit_fixedt1(t1_fixed):
+    # def model_1d_exsy_fixedt1(t1_fixed):
     #     def wrapped(x, k, t1=t1_fixed):
-    #         return exsy1dfit(x, k, t1)
+    #         return model_1d_exsy(x, k, t1)
     #     return wrapped
 
     # if fixed_t1 is None:
-    #     model = exsy1dfit
-    #     popt, pconv = curve_fit(exsy1dfit, mixtimes, intensities,
-    #                             p0=[DEFAULT_K, DEFAULT_T1])
+    #     model = model_1d_exsy
+    #     popt, pconv = curve_fit(
+    #         model_1d_exsy, mixing_times, intensities, p0=[default_k, default_t1]
+    #     )
     # else:
-    #     model = exsy1dfit_fixedt1(fixed_t1)
-    #     popt, pconv = curve_fit(exsy1dfit, mixtimes, intensities, p0=[DEFAULT_K])
+    #     model = model_1d_exsy_fixedt1(fixed_t1)
+    #     popt, pconv = curve_fit(
+    #         model_1d_exsy, mixing_times, intensities, p0=[default_k]
+    #     )
 
     if plot:
         fig, ax = plt.subplots()
-        ax.scatter(mixtimes, intensities)
+        ax.scatter(mixing_times, intensities)
 
-        xfit = np.linspace(min(mixtimes), max(mixtimes), 100)
+        xfit = np.linspace(min(mixing_times), max(mixing_times), 100)
         ax.plot(xfit, fit_result.eval(x=xfit), "r-")
         # fit_result.plot_fit(ax=ax, numpoints=100, fitfmt='r-')
 
         ax.set_xlabel("Mixing Time (s)", fontname="Arial", fontsize=16)
         ax.set_ylabel("Normalized Peak Intensity", fontname="Arial", fontsize=16)
 
-        if savename is not None:
-            plt.savefig(savename, bbox_inches="tight", dpi=300)
+        if save_path:
+            plt.savefig(save_path, bbox_inches="tight", dpi=300)
 
         return fit_result, fig, ax
 

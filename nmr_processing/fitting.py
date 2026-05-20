@@ -22,7 +22,31 @@ from ssNMR.fitting import fit
 from ssNMR.formatting import format_plot
 
 
-def T2_Fit(x, y, t0=0.5, c0=1, beta0=0.5, showall=False, fittype="default"):
+def T2_Fit(x, y, t0=0.5, c0=1, beta0=0.5, fit_type="default", show_all=False):
+    """
+    Fit T2 relaxation decay data using monoexponential, biexponential,
+    or stretched exponential models.
+
+    Parameters
+    ----------
+    x : array-like
+        Echo delay times.
+    y : array-like
+        Normalized intensity measurements.
+    t0 : float, default: 0.5
+        Initial guess for the relaxation time constant.
+    c0 : float, default: 1
+        Initial amplitude guess for the stretched exponential model.
+    beta0 : float, default: 0.5
+        Initial stretching exponent guess.
+    fit_type : str, optional
+        If set to a specific model name, that model is used. Otherwise the highest-R²
+        model is selected.
+    show_all : bool, default: False
+        If True, plot all three candidate models. Otherwise, plot only the selected
+        model.
+    """
+
     def monoExp_t(x, t):
         result = []
         for i in x:
@@ -70,11 +94,11 @@ def T2_Fit(x, y, t0=0.5, c0=1, beta0=0.5, showall=False, fittype="default"):
     fit_types = ["Mono-exponential", "Bi-exponential", "Stretched exponential"]
     R_max = max(All_R)
     method_choice = All_R.index(R_max)
-    if fittype != "default":
-        method_choice = fit_types.index(fittype)
+    if fit_type != "default":
+        method_choice = fit_types.index(fit_type)
     # print(All_R, method_choice)
 
-    if fittype == "default":
+    if fit_type == "default":
         if method_choice == 0:
             YY = monoT2
 
@@ -105,7 +129,7 @@ def T2_Fit(x, y, t0=0.5, c0=1, beta0=0.5, showall=False, fittype="default"):
 
     fig, ax = plt.subplots()
 
-    if showall:
+    if show_all:
         plt.plot(x, y, "o", color="black", label="Experimental Data")
         plt.plot(x, monoT2, "--", color="teal", label=method_str[0] + " fit")
         plt.plot(x, biexpT2, "-.", color="orange", label=method_str[1] + " fit")
@@ -127,61 +151,93 @@ def T2_Fit(x, y, t0=0.5, c0=1, beta0=0.5, showall=False, fittype="default"):
     print(f"R² = {R_max}")
 
 
-def T1_IR_func(time, T1, init_intensity, A):
-    # fit T1 for inversion recovery measurement
+def T1_IR_func(time, T1, full_intensity, A):
+    """
+    T1 relaxation model for inversion recovery experiments.
+
+    Parameters
+    ----------
+    time : array-like
+        Delay times in seconds.
+    T1 : float or array-like
+        Longitudinal relaxation time constant(s) in seconds.
+    full_intensity : float
+        Initial signal intensity.
+    A : float
+        Inversion factor.
+
+    Returns
+    -------
+    np.ndarray
+        Modeled intensity values.
+    """
+
     time = np.array(time, dtype=np.longdouble)
     T1 = np.array(T1, dtype=np.longdouble)
-    return init_intensity * (1 - 2 * A * np.exp(-1 * time / T1))
+    return full_intensity * (1 - 2 * A * np.exp(-1 * time / T1))
 
 
-def T1_SR_func(time, T1, init_intensity, A):
-    # fit T1 for saturation recovery measurement
+def T1_SR_func(time, T1, full_intensity, A):
+    """
+    T1 relaxation model for saturation recovery experiments.
+
+    Parameters
+    ----------
+    time : array-like
+        Delay times in seconds.
+    T1 : float or array-like
+        Longitudinal relaxation time constant(s) in seconds.
+    full_intensity : float
+        Initial signal intensity.
+    A : float
+        Saturation factor.
+
+    Returns
+    -------
+    np.ndarray
+        Modeled intensity values.
+    """
+
     time = np.array(time, dtype=np.longdouble)
     T1 = np.array(T1, dtype=np.longdouble)
-    return init_intensity * (1 - A * np.exp(-1 * time / T1))
+    return full_intensity * (1 - A * np.exp(-1 * time / T1))
 
 
 # Eventually want to make these functions fit in here better
 def fit_T1_IR(
-    save_dir,
-    save_name,
     delay_data,
     intensity_data,
     labels=None,
     normalize=False,
     show_plot=True,
     colors=["red", "blue", "green"],
+    save_path=None,
 ):
     """
-    DESCRIPTION:
-    Given delay and intensity data for a T1 inversion recovery experiment, extract out
-    the T1 time constant in s
+    Fit inversion recovery data and extract T1 time constants.
 
-    PARAMETERS:
-        save_dir: string
-            Directory to save plot figure
-        save_name: string
-            Figure save file name
-        delay_data: array of arrays
-            List of delay data each acquistion was run at, for each resonance,
-            i.e. [delay_para, delay_dia], where delay_para = [1,3,5,7,10,30,50,80]
-        intensity_data: array of arrays
-            List of the intensity values extracted from a component/ group of
-            components after fitting the spectra
-        labels: array of strings
-            Label names for each component/ group of components
-        normalize: boolean
-            Whether or not to normalize the plot values.
-    RETURNS: [T2_list, unscaled_percentages, scaled_percentages]
-        T2_list: array of floats
-            list of T1 constants corresponding to each component/ group of components
-            specified in intensity_data, index-matched
-        unscaled_percentages: array of floats
-            list of unscaled molar percentages of each component/ group of components
-            specified in intensity_data, index-matched
-        scaled_percentages: array of floats
-            list of T1 scaled molar percentages of each component/ group of components
-            specified in intensity_data, index-matched
+    Parameters
+    ----------
+    delay_data : list of array-like
+        Delay times for each component in seconds.
+    intensity_data : list of array-like
+        Intensity values to fit for each component.
+    labels : list of str, optional
+        Labels for each component. If not specified, components will be labeled as
+        numbered features.
+    normalize : bool, default: False
+        If True, normalize intensity values before fitting.
+    show_plot : bool, default: True
+        If True, display the fit plot.
+    colors : list, default: ["red", "blue", "green"]
+        Plot colors for each component, as specified by `matplotlib`.
+    save_path : str, optional
+        Path to save the plot figure. If not specified, the figure is not saved.
+
+    Returns
+    -------
+    list
+        List of T1 relaxation times in seconds.
     """
 
     extracted_intensities = []
@@ -219,22 +275,22 @@ def fit_T1_IR(
             bounds=(0, [np.inf, np.inf, 2]),
         )
         T1 = popt[0]
-        init_intensity = popt[1]
+        full_intensity = popt[1]
         A = popt[2]
 
         std_dev = np.sqrt(np.diag(pcov))
         T1_std_dev = std_dev[0]
-        init_intensity_std_dev = std_dev[1]
+        full_intensity_std_dev = std_dev[1]
         # A_std = std_dev[2]
 
         if normalize:
-            abs_init_intensity = init_intensity * norm_factor[i]
-            abs_init_intensity_std_dev = init_intensity_std_dev * norm_factor[i]
+            abs_full_intensity = full_intensity * norm_factor[i]
+            abs_full_intensity_std_dev = full_intensity_std_dev * norm_factor[i]
         else:
-            abs_init_intensity = init_intensity
-            abs_init_intensity_std_dev = init_intensity_std_dev
+            abs_full_intensity = full_intensity
+            abs_full_intensity_std_dev = full_intensity_std_dev
 
-        extracted_intensities.append(abs_init_intensity)
+        extracted_intensities.append(abs_full_intensity)
         T1_list.append(T1)
 
         print("-----------------------------------------------")
@@ -242,17 +298,17 @@ def fit_T1_IR(
         print("-----------------------------------------------")
         print("T1 constant: {} s".format(np.round(T1, 6)))
         print("T1 constant std dev: {} s".format(np.round(T1_std_dev, 4)))
-        print("Initial intensity: {}".format(np.round(abs_init_intensity, 0)))
+        print("Full intensity: {}".format(np.round(abs_full_intensity, 0)))
         print(
             "Initial intensity std dev: {}".format(
-                np.round(abs_init_intensity_std_dev, 0)
+                np.round(abs_full_intensity_std_dev, 0)
             )
         )
         print("A: {}".format(np.round(A, 4)))
         print("A std dev: {}".format(np.round(A, 4)))
 
         xfit = np.linspace(min(delay), max(delay))
-        plt.plot(xfit, T1_IR_func(xfit, T1, init_intensity, A), "-", color="black")
+        plt.plot(xfit, T1_IR_func(xfit, T1, full_intensity, A), "-", color="black")
 
     plt.xlabel("Time (s)")
     if normalize:
@@ -270,8 +326,8 @@ def fit_T1_IR(
         verticalalignment="center",
         transform=ax.transAxes,
     )
-
-    plt.savefig(save_dir + save_name + ".png", bbox_inches="tight", dpi=300)
+    if save_path:
+        plt.savefig(save_path, bbox_inches="tight", dpi=300)
     if show_plot:
         plt.show()
     plt.close()
@@ -280,44 +336,39 @@ def fit_T1_IR(
 
 
 def fit_T1_SR(
-    save_dir,
-    save_name,
     delay_data,
     intensity_data,
     labels=None,
     normalize=False,
     show_plot=True,
     colors=["red", "blue", "green"],
+    save_path=None,
 ):
     """
-    Given delay and intensity data for a T1 saturation recovery experiment, extract out
-    the T1 time constant in s
+    Fit saturation recovery data and extract T1 time constants.
 
-    PARAMETERS:
-        save_dir: string
-            Directory to save plot figure
-        save_name: string
-            Figure save file name
-        delay_data: array of arrays
-            List of delay data each acquistion was run at, for each resonance,
-            i.e. [delay_para, delay_dia], where delay_para = [1,3,5,7,10,30,50,80]
-        intensity_data: array of arrays
-            List of the intensity values extracted from a component or group of
-            components after fitting the spectra
-        labels: array of strings
-            Label names for each component/ group of components
-        normalize: boolean
-            Whether or not to normalize the plot values.
-    RETURNS: [T2_list, unscaled_percentages, scaled_percentages]
-        T2_list: array of floats
-            list of T1 constants corresponding to each component or group of components
-            specified in intensity_data, index-matched
-        unscaled_percentages: array of floats
-            list of unscaled molar percentages of each component or group of components
-            specified in intensity_data, index-matched
-        scaled_percentages: array of floats
-            list of T1 scaled molar percentages of each component or group of components
-            specified in intensity_data, index-matched
+    Parameters
+    ----------
+    delay_data : list of array-like
+        Delay times for each component in seconds.
+    intensity_data : list of array-like
+        Intensity values to fit for each component.
+    labels : list of str, optional
+        Labels for each component. If not specified, components will be labeled as
+        numbered features.
+    normalize : bool, default: False
+        If True, normalize intensity values before fitting.
+    show_plot : bool, default: True
+        If True, display the fit plot.
+    colors : list, default: ["red", "blue", "green"]
+        Plot colors for each component, as specified by `matplotlib`.
+    save_path : str, optional
+        Path to save the plot figure. If not specified, the figure is not saved.
+
+    Returns
+    -------
+    list
+        List of T1 relaxation times in seconds.
     """
 
     extracted_intensities = []
@@ -355,22 +406,22 @@ def fit_T1_SR(
             bounds=(0, [np.inf, np.inf, 1]),
         )
         T1 = popt[0]
-        init_intensity = popt[1]
+        full_intensity = popt[1]
         A = popt[2]
 
         std_dev = np.sqrt(np.diag(pcov))
         T1_std_dev = std_dev[0]
-        init_intensity_std_dev = std_dev[1]
+        full_intensity_std_dev = std_dev[1]
         # A_std = std_dev[2]
 
         if normalize:
-            abs_init_intensity = init_intensity * norm_factor[i]
-            abs_init_intensity_std_dev = init_intensity_std_dev * norm_factor[i]
+            abs_full_intensity = full_intensity * norm_factor[i]
+            abs_full_intensity_std_dev = full_intensity_std_dev * norm_factor[i]
         else:
-            abs_init_intensity = init_intensity
-            abs_init_intensity_std_dev = init_intensity_std_dev
+            abs_full_intensity = full_intensity
+            abs_full_intensity_std_dev = full_intensity_std_dev
 
-        extracted_intensities.append(abs_init_intensity)
+        extracted_intensities.append(abs_full_intensity)
         T1_list.append(T1)
 
         print("-----------------------------------------------")
@@ -378,17 +429,17 @@ def fit_T1_SR(
         print("-----------------------------------------------")
         print("T1 constant: {} s".format(np.round(T1, 6)))
         print("T1 constant std dev: {} s".format(np.round(T1_std_dev, 4)))
-        print("Initial intensity: {}".format(np.round(abs_init_intensity, 0)))
+        print("Full intensity: {}".format(np.round(abs_full_intensity, 0)))
         print(
             "Initial intensity std dev: {}".format(
-                np.round(abs_init_intensity_std_dev, 0)
+                np.round(abs_full_intensity_std_dev, 0)
             )
         )
         print("A: {}".format(np.round(A, 4)))
         print("A std dev: {}".format(np.round(A, 4)))
 
         xfit = np.linspace(min(delay), max(delay))
-        plt.plot(xfit, T1_SR_func(xfit, T1, init_intensity, A), "-", color="black")
+        plt.plot(xfit, T1_SR_func(xfit, T1, full_intensity, A), "-", color="black")
 
     plt.xlabel("Time (s)")
     if normalize:
@@ -407,8 +458,8 @@ def fit_T1_SR(
         transform=ax.transAxes,
     )
 
-    if save_name:
-        plt.savefig(save_name, bbox_inches="tight", dpi=300)
+    if save_path:
+        plt.savefig(save_path, bbox_inches="tight", dpi=300)
     if show_plot:
         plt.show()
     plt.close()
@@ -446,30 +497,31 @@ def fit_T1_spectra(
     saturation=False,
 ):
     """
-    Given a set of T1 relaxation data, automatically fit all spectra, and extract of T1
-    constants and scaled intensity values for all components
+    Fit a series of T1 spectra and extract relaxation times for all components.
 
-    PARAMETERS:
-        data_files: list of strings
-            List of files containing T1 relaxation experiments, with varying interpulse
-            delays
-        delays: array of floats
-            List of delays for each of the spectra in data_files, index-matched
-        normalize: boolean
-            Whether or not to normalize the plot for T1 intensity decay
-        **kwargs: key-word arguments
-            key-word arguments corresponding to the 'fit' function. See 'fit' function
-            for details
-    RETURNS: [T1_list, unscaled_percentages, scaled_percentages]
-        T1_list: array of floats
-            list of T1 constants (in s) corresponding to each component or group of
-            components specified in intensity_data, index-matched
-        unscaled_percentages: array of floats
-            list of unscaled molar percentages of each component or group of components
-            specified in intensity_data, index-matched
-        scaled_percentages: array of floats
-            list of T2 scaled molar percentages of each component or group of components
-            specified in intensity_data, index-matched
+    Parameters
+    ----------
+    data_files : list of strings
+        List of files containing T1 relaxation experiments, with varying interpulse
+        delays
+    delays : array of floats
+        List of delays for each of the spectra in data_files, index-matched
+    normalize : boolean
+        Whether or not to normalize the plot for T1 intensity decay
+    **kwargs : key-word arguments
+        key-word arguments corresponding to the `fit` function. See `fit` function
+        for details
+    Returns
+    -------
+    T1_list : array of floats
+        list of T1 constants (in s) corresponding to each component or group of
+        components specified in intensity_data, index-matched
+    unscaled_percentages : array of floats
+        list of unscaled molar percentages of each component or group of components
+        specified in intensity_data, index-matched
+    scaled_percentages : array of floats
+        list of T2 scaled molar percentages of each component or group of components
+        specified in intensity_data, index-matched
     """
     amplitudes = []
     comp_group_index = []

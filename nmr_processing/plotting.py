@@ -8,6 +8,8 @@ TODO: set plwidth/height at plt.subplots, not later
 TODO: Change f1p/f2p to xmax and update the way it's checked
 TODO: Allow kwarg input via bundle
 TODO: Add overlay function for data not in same folder
+TODO: Document bundles
+TODO: Add save_path to rest of plotting functions
 """
 
 import matplotlib.pyplot as plt
@@ -56,17 +58,29 @@ plt.rcParams.update(params)
 
 def plot_1d(arg, proc_num=1, f1p=0, f2p=0, plwidth=15, plheight=12):
     """
-    Plot 1D NMR data from raw Bruker files.
+    Plot a 1D NMR spectrum.
 
-    The first argument must be either:
+    Parameters
+    ----------
+    arg : dict or str
+        Either a data bundle or the path to a Bruker experiment folder.
+    proc_num : int, default: 1
+        Processing number containing the 1D dataset, used only if a path is provided.
+    f1p : float, optional
+        Left x-axis limit in ppm.
+    f2p : float, optional
+        Right x-axis limit in ppm.
+    plwidth : float, default: 15
+        Figure width in inches.
+    plheight : float, default: 12
+        Figure height in inches.
 
-    bundle: Dictionary containing the data used for plotting.
-    exp_path: Top-level experiment folder containing the 1D NMR data.
+    Returns
+    -------
+    dict
+        Data bundle updated with `fig` and `ax` objects.
 
-    proc_num: Process number of data to be plotted (default = 1). If bundle provided,
-              this does nothing.
-    f1p/f2p: Left and right limits of x-axis, order agnostic.
-    plheight/plwidth: Plot height/width in inches (default = 15x18).
+    CHECK: Are f1p/f2p the correct variable names? F1!=F2...
     """
 
     if isinstance(arg, dict):
@@ -130,25 +144,38 @@ def plot_folder(
     stacking_factor=0,
 ):
     """
-    Function to plot stacked all 1D NMR data from a folder of raw Bruker files.
+    Plot stacked 1D NMR spectra.
 
-    The first argument must be either:
+    Parameters
+    ----------
+    arg : dict or str
+        Either a bundle of multiple experiments' data or the path to a directory
+        containing experiment folders.
+    exp_nums : list of int, optional
+        Experiment numbers to plot (e.g., [1, 5, 6, 10]). If not provided, all numeric
+        subfolders are loaded.
+    normalize : bool, default: False
+        If True, normalize all spectra by their maximum intensity.
+    mass : float or sequence, optional
+        Mass normalization factor for each experiment. Not used if `normalize` is True.
+        Does not normalize by default.
+    f1p : float, optional
+        Left x-axis limit in ppm.
+    f2p : float, optional
+        Right x-axis limit in ppm.
+    plwidth : float, default: 15
+        Figure width in inches.
+    plheight : float, default: 18
+        Figure height in inches.
+    stacking_factor : float, default: 0
+        Vertical offset factor between stacked spectra. A value of 0 will overlay
+        spectra (default behavior). A value of 1 will line up spectra baselines with the
+        previous spectrum's maximum.
 
-    bundle: Dictionary containing the data used for plotting. This must be of the form
-            {'exp_1': exp_bundle, 'exp_5': exp_bundle, 'exp_6': exp_bundle, etc.}.
-    dir_path: Top-level data directory containing all 1D NMR experiment folders.
-
-    exp_nums: List of experiment numbers (e.g., [1, 5, 6, 10]). If bundle provided,
-              this does nothing. Providing an empty list (default) will plot all
-              experiments in the folder.
-    mass: List of masses for each experiment for normalization.
-    normalize: Normalize max intensities if true. If False, normalize by mass if list of
-               masses provided, otherwise do not normalize. (default = False).
-    f1p/f2p: Left and right limits of x-axis, order agnostic.
-    plheight/plwidth: Plot height/width in inches (default = 15x18).
-    stacking_factor: The amount of space between stacked spectra, scaled by spectrum
-                     intensity. A value of 0 will overlay spectra. A value of 1 will
-                     line up spectra baselines with the previous spectrum's maximum.
+    Returns
+    -------
+    dict
+        Data bundle updated with `fig` and `ax` objects.
     """
 
     # Get bundle of experiment bundles
@@ -223,23 +250,39 @@ def plot_2d(
     show_projections=True,
 ):
     """
-    Function to plot 2D NMR data from raw Bruker files.
+    Plot countours of 2D NMR data.
 
-    The first argument must be either:
-    bundle: Dictionary containing the data used for plotting.
-    exp_path: Top-level experiment folder containing the 2D NMR data.
+    Parameters
+    ----------
+    arg : dict or str
+        Either a data bundle or the path to a Bruker experiment directory.
+    proc_num : int, default: 1
+        Processing number containing the 2D dataset, used only if a path is provided.
+    f1l : float, optional
+        Lower limit of the F1 axis in ppm.
+    f1r : float, optional
+        Upper limit of the F1 axis in ppm.
+    f2l : float, optional
+        Left limit of the F2 axis in ppm.
+    f2r : float, optional
+        Right limit of the F2 axis in ppm.
+    factor : float, default: 0.02
+        Contour threshold as a fraction of the maximum intensity.
+    clevels : int, default: 10
+        Number of contour levels to show in plot.
+    color : bool, default: True
+        If True, plot color-filled contours. If False, plot black contour lines.
+    plheight : float, default: 12
+        Figure height in inches.
+    plwidth : float, default: 12
+        Figure width in inches.
+    show_projections : bool, default: True
+        If True, show projection traces along both axes. Otherwise, only show 2D plot.
 
-    proc_num: Process number of data to be plotted (default = 1). If bundle provided,
-              this does nothing.
-    f1l/f1r: Left and right limits of F1 (vertical) dimension.
-    f2l/f2r: :eft and right limits of F2 (horizontal) dimension.
-    factor: Minimum value for the contours (factor*max value).
-            (default = 0.02, 2% of max signal)
-    clevels: Number of contour levels for plot (default = 10).
-    color: If True, plot with log-scaled color contours. Otherwise, just use black
-            lines (default = True, color on).
-    plheight/plwidth: Plot height/width in inches (default = 12x12).
-    show_projections: If False, hide projections along each axis. Default = True.
+    Returns
+    -------
+    dict
+        Data bundle updated with `fig` and `ax` objects.
 
     CHECK: Does this work with psuedo-2D data?
     """
@@ -377,23 +420,35 @@ def plot_2d(
 
 
 def plot_slice(
-    arg, proc_num=1, slice_idx=0, plwidth=15, plheight=12, f2l=1, f2r=-1, save_path=""
+    arg, proc_num=1, slice_idx=0, plwidth=15, plheight=12, f2l=1, f2r=-1, save_path=None
 ):
     """
-    Plot a single slice from a pseudo-2D experiment. Defaults to first slice.
+    Plot a single slice from a pseudo-2D experiment.
 
-    Will save plot to save_path path if specified.
+    Parameters
+    ----------
+    arg : dict or str
+        Either a pseudo-2D data bundle or the path to a Bruker experiment directory.
+    proc_num : int, default: 1
+        Processing number containing the psuedo-2D dataset, used only if a path is
+        provided.
+    slice_idx : int, default: 0
+        Zero-based index of the slice to plot.
+    plwidth : float, default: 15
+        Figure width in inches.
+    plheight : float, default: 12
+        Figure height in inches.
+    f2l : float, default: 1
+        Left x-axis limit in ppm.
+    f2r : float, default: -1
+        Right x-axis limit in ppm.
+    save_path : str, optional
+        Path to save the plot figure. If not specified, the figure is not saved.
 
-    The first argument must be either:
-    bundle: Dictionary containing the data used for plotting.
-    exp_path: Top-level experiment folder containing the 2D NMR data.
-
-    proc_num: Process number of data to be plotted (default = 1). If bundle provided,
-              this does nothing.
-    slice_idx: The slice to plot, with a zero-based index.
-    f2l/f2r: Left and right limits in ppm.
-    plheight/plwidth: Plot height/width in inches (default = 12x12).
-    save_path: The path to save the plot figure to. Will not save if not provided.
+    Returns
+    -------
+    dict
+        Data bundle updated with `fig` and `ax` objects.
 
     TODO: Make plot_slice work with true 2D data.
     """
@@ -450,13 +505,24 @@ def sim_diffusion(
     This function is meant to help estimate appropriate parameters for your experiment
     but you should still run test experiments on your spectrometer!
 
-    nuclide: String of the format {mass number}{symbol}, e.g. '1H' or '27Al'.
-    little_delta: Length of each gradient pulse in [ms].
-    big_delta: diff_coeffiffusion time, measured between the starting times of the two
-               gradient pulses in [ms].
-    max_gradient: The maximum gradient strength in T/m? or G/cm?
-    diff_coeff: Diffusion coefficient(s) to simulate, in [m^2/s]. If unspecified, this
-                will default to a logscale range of 1e-7 to 1e-15 m^2/s.
+    Parameters
+    ----------
+    nuclide : str
+        Nuclide label in the form '{mass number}{symbol}', for example '1H' or '27Al'.
+    little_delta : float, default: 1
+        Gradient pulse duration in milliseconds.
+    big_delta : float, default: 20
+        Diffusion interval in milliseconds.
+    max_gradient : float, default: 17
+        Maximum gradient strength in G/cm. CHECK: gradient units
+    diff_coeff : float or array-like, optional
+        Diffusion coefficient(s) in m^2/s. If not specified, a default log-spaced range
+        is used.
+
+    Returns
+    -------
+    dict
+        Bundle containing the generated figure, axes, and simulation data.
     """
 
     # convert ms to s
@@ -478,7 +544,7 @@ def sim_diffusion(
 
     # CHECK: Is this a sensible range?
     gradient_vals = np.arange(0, max_gradient * 1.01, max_gradient / 99.0)
-    exponent_coefficient_list = [  #: CHECK Why is there a 2pi factor?
+    exponent_coefficient_list = [  # 2pi factor is because gamma is rads/T/s
         (2 * np.pi * gamma * little_delta * gradient) ** 2
         * (big_delta - (little_delta / 3))
         for gradient in gradient_vals
@@ -537,6 +603,17 @@ def plot_t2_relaxation(peak_ints_norm, l1, l2, cnst31):
     """
     Plot data of a T2 relaxation experiment. Use `get_pseudo2d_data` to read data.
 
+    Parameters
+    ----------
+    peak_ints_norm : array-like
+        Normalized peak intensities for each echo delay.
+    l1 : float
+        Number of rotor periods between pulses in first slice.
+    l2 : float
+        Number of rotor periods pulse delay in incremented between slices.
+    cnst31 : float
+        MAS spinning rate in Hz.
+
     TODO: Wrap T2_plot so user can provide just exp_path
     """
 
@@ -555,18 +632,33 @@ def plot_t2_relaxation(peak_ints_norm, l1, l2, cnst31):
 
 def diff_plot(peak_ints_norm, exp_path):
     """
-    Diffusion plotting function, uses data read from the xf2 function
+    Plot diffusion attenuation data against gradient strength.
+
+    Parameters
+    ----------
+    peak_ints_norm : array-like
+        Normalized peak intensities from the diffusion experiment.
+    exp_path : str
+        Path to the experiment directory containing diff.xml metadata.
+
+    Returns
+    -------
+    dict
+        Bundle containing the generated figure, axes, and diffusion data.
 
     TODO: Add data getting to diff_plot so peak_ints_norm is not needed
     """
 
     bundle = get_diff_params(exp_path)
 
-    _, ax = plt.subplots()
+    fig, ax = plt.subplots()
     plt.plot(
         bundle["gradient_list"], peak_ints_norm, "o"
     )  # , c='red', mfc='blue', mec='blue')
     ax.set_xlabel(r"Gradient Strength / G cm$\mathregular{^{-1}}$")
     ax.set_ylabel("Normalized Intensity")
+
+    bundle["fig"] = fig
+    bundle["ax"] = ax
 
     return bundle
