@@ -1,4 +1,11 @@
-from distutils.core import setup
+"""
+Setup script for the nmr-processing package.
+
+This module defines the package metadata and installation settings for
+`nmr-processing`, a collection of tools for processing and plotting NMR data.
+"""
+
+from setuptools import setup
 
 setup(name='nmr-processing',
       version='0.1.0',

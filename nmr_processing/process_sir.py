@@ -28,7 +28,7 @@ from nmr_processing.processing import (
 )
 
 
-def read_t1ints(exp_path, proc_num=1, delay_offset=True, normalize=True):
+def read_t1ints(exp_path, *, proc_num=1, delay_offset=True, normalize=True):
     """
     Read T1 intensity data from the Topspin-generated `t1ints.txt` file.
 
@@ -149,6 +149,7 @@ def load_vdlist(
 
 def process_sir(
     exp_path,
+    *,
     proc_num=1,
     peak_pos=None,
     regions=None,
@@ -217,6 +218,7 @@ def make_cifit_files(
     filename,
     delays,
     intensities,
+    *,
     title=None,
     peak_names=None,
     r1_guesses=None,
@@ -292,6 +294,7 @@ def make_cifit_files(
 
 def make_mch_file(
     filename,
+    *,
     sites=2,
     processes=1,
     r1_guesses=None,
@@ -411,7 +414,7 @@ def make_mch_file(
         file.writelines(s + "\n" for s in mch_lines)
 
 
-def make_dat_file(filename, delays, intensities, title="TEST", peak_names=None):
+def make_dat_file(filename, delays, intensities, *, title="TEST", peak_names=None):
     """
     Write a CIFIT `.dat` file containing delay and intensity data.
 
@@ -465,6 +468,7 @@ def make_dat_file(filename, delays, intensities, title="TEST", peak_names=None):
 
 def exp_to_cifit(
     exp_path,
+    *,
     filename=None,
     proc_num=1,
     peak_pos=None,
@@ -566,7 +570,7 @@ def exp_to_cifit(
 
 
 def plot_cifit_csv(
-    file_path, n_sites=2, site_names=None, data_rows=16, fit_rows=101, save_path=None
+    file_path, *, n_sites=2, site_names=None, data_rows=16, fit_rows=101, save_path=None
 ):
     """
     Plot CIFIT result data from the output CSV file.
@@ -716,7 +720,7 @@ def get_1d_exsy_data(dir_path, exp_nums):
     return d15_vals, peak_ints_norm
 
 
-def analyze_lpsc_1d_exsys(dir_path, exp_nums, plot=False):
+def analyze_lpsc_1d_exsys(dir_path, exp_nums, *, plot=False):
     """
     Analyze LPSC 1D EXSY experiments by fitting two Pseudo-Voigt peaks.
 
@@ -753,16 +757,16 @@ def analyze_lpsc_1d_exsys(dir_path, exp_nums, plot=False):
 
     lpsc_peak1 = PseudoVoigtModel(prefix="p1_")
     init_pars = lpsc_peak1.make_params(
-        center=dict(value=1.2, min=-10, max=10),
-        amplitude=dict(value=0.6 * amplitude, min=0),
-        sigma=dict(value=0.1, min=0.001, max=3),
+        center={"value": 1.2, "min": -10, "max": 10},
+        amplitude={"value": 0.6 * amplitude, "min": 0},
+        sigma={"value": 0.1, "min": 0.001, "max": 3},
     )
     lpsc_peak2 = PseudoVoigtModel(prefix="p2_")
     init_pars.update(
         lpsc_peak2.make_params(
-            center=dict(value=1, min=-10, max=10),
-            amplitude=dict(value=0.4 * amplitude, min=0),
-            sigma=dict(value=0.1, min=0.001, max=3),
+            center={"value": 1, "min": -10, "max": 10},
+            amplitude={"value": 0.4 * amplitude, "min": 0},
+            sigma={"value": 0.1, "min": 0.001, "max": 3},
         )
     )
 
@@ -810,7 +814,9 @@ def analyze_lpsc_1d_exsys(dir_path, exp_nums, plot=False):
     return d15_vals, [p1_ints, p2_ints]
 
 
-def fit_1d_exsys(mixing_times, intensities, fixed_t1=None, plot=True, save_path=None):
+def fit_1d_exsys(
+    mixing_times, intensities, *, fixed_t1=None, plot=True, save_path=None
+):
     """
     Fit 1D EXSY exchange data to a simple kinetic decay model.
 

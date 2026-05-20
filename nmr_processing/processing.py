@@ -12,7 +12,7 @@ from nmrglue.fileio import bruker
 from scipy import signal
 
 
-def get_1d_data(exp_path, proc_num=1, include_md=False):
+def get_1d_data(exp_path, *, proc_num=1, include_md=False):
     """
     Read 1D NMR data from raw Bruker experiment files.
 
@@ -102,13 +102,13 @@ def get_data_from_folder(dir_path, exp_nums=None):
 
     # If all exps have the same set of x vals, add a key to the bundle with that set
     first_x_vals = x_vals_list[0]
-    if all([(x_vals_ppm == first_x_vals).all() for x_vals_ppm in x_vals_list]):
+    if all((x_vals_ppm == first_x_vals).all() for x_vals_ppm in x_vals_list):
         bundle["x_vals_ppm"] = first_x_vals
 
     return bundle
 
 
-def get_2d_data(exp_path, proc_num=1):
+def get_2d_data(exp_path, *, proc_num=1):
     """
     Read 2D NMR data from raw Bruker files.
 
@@ -215,7 +215,7 @@ def get_diff_params(exp_path):
     return bundle
 
 
-def get_pseudo2d_data(exp_path, proc_num=1):
+def get_pseudo2d_data(exp_path, *, proc_num=1):
     """
     Read pseudo-2D NMR data from raw Bruker files.
 
@@ -266,6 +266,7 @@ def get_pseudo2d_data(exp_path, proc_num=1):
 def get_peak_slice_intensities(
     x_vals_ppm,
     y_data,
+    *,
     peak_pos=None,
     prominence=None,
 ):

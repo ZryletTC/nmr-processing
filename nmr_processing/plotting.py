@@ -56,7 +56,7 @@ params = {
 plt.rcParams.update(params)
 
 
-def plot_1d(arg, proc_num=1, f1p=0, f2p=0, plwidth=15, plheight=12):
+def plot_1d(arg, *, proc_num=1, f1p=0, f2p=0, plwidth=15, plheight=12):
     """
     Plot a 1D NMR spectrum.
 
@@ -134,6 +134,7 @@ def plot_1d(arg, proc_num=1, f1p=0, f2p=0, plwidth=15, plheight=12):
 
 def plot_folder(
     arg,
+    *,
     exp_nums=None,
     mass=1,
     normalize=False,
@@ -224,7 +225,7 @@ def plot_folder(
     fig.set_figwidth(plwidth)
 
     # If all nuclei are the same, use specific label, otherwise just use 'shift / ppm'
-    if len(set([exp_bundle["nucleus"] for exp_bundle in bundle])) == 1:
+    if len({exp_bundle["nucleus"] for exp_bundle in bundle}) == 1:
         plt.xlabel(nucleus_label(bundle))
     else:
         plt.xlabel("shift / ppm")
@@ -237,6 +238,7 @@ def plot_folder(
 
 def plot_2d(
     arg,
+    *,
     proc_num=1,
     f1l=0,
     f1r=0,
@@ -420,7 +422,15 @@ def plot_2d(
 
 
 def plot_slice(
-    arg, proc_num=1, slice_idx=0, plwidth=15, plheight=12, f2l=1, f2r=-1, save_path=None
+    arg,
+    *,
+    proc_num=1,
+    slice_idx=0,
+    plwidth=15,
+    plheight=12,
+    f2l=1,
+    f2r=-1,
+    save_path=None,
 ):
     """
     Plot a single slice from a pseudo-2D experiment.
@@ -497,7 +507,7 @@ def plot_slice(
 
 
 def sim_diffusion(
-    nuclide, little_delta=1, big_delta=20, max_gradient=17, diff_coeff=None
+    nuclide, *, little_delta=1, big_delta=20, max_gradient=17, diff_coeff=None
 ):
     """
     Simulate and plot the attenuation curve of a diffusion experiment.
@@ -599,7 +609,7 @@ def sim_diffusion(
     return bundle
 
 
-def plot_t2_relaxation(peak_ints_norm, l1, l2, cnst31):
+def plot_t2_relaxation(peak_ints_norm, *, l1, l2, cnst31):
     """
     Plot data of a T2 relaxation experiment. Use `get_pseudo2d_data` to read data.
 
