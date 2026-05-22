@@ -6,4 +6,5 @@ Bruker NMR data in the nmr-processing project.
 
 TODO: Add sphinx (or similar) documentation
 TODO: Refactor arguments into dataclasses and reenable pylint too-many checks
+TODO: Test issue creation and url insertion with todo-issues
 """
