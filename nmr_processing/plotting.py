@@ -184,7 +184,9 @@ def plot_folder(
         bundle = arg
     elif isinstance(arg, str):
         dir_path = arg
-        bundle = get_data_from_folder(dir_path=dir_path, exp_nums=exp_nums)
+        bundle = get_data_from_folder(
+            dir_path=dir_path, exp_nums=exp_nums, normalize=normalize, mass=mass
+        )
     else:
         raise TypeError(
             "The first argument of this function must be a string of the path to a "
@@ -198,12 +200,6 @@ def plot_folder(
     for exp_num, exp_bundle in bundle.items():
         x_data = exp_bundle["x_vals_ppm"]
         y_data = exp_bundle["y_data"]
-
-        if normalize:
-            # y_data -= min(y_data)
-            y_data /= max(y_data)
-        else:
-            y_data = y_data / mass
 
         plt.plot(x_data, y_data + y_offset, label=f"exp {exp_num}")
         y_offset = y_offset + max(y_data) * stacking_factor

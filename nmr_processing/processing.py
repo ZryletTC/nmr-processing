@@ -64,7 +64,7 @@ def get_1d_data(exp_path, *, proc_num=1, include_md=False):
     return bundle
 
 
-def get_data_from_folder(dir_path, exp_nums=None):
+def get_data_from_folder(dir_path, exp_nums=None, *, normalize=False, mass=1):
     """
     Load a set of 1D Bruker experiments from a directory.
 
@@ -74,14 +74,15 @@ def get_data_from_folder(dir_path, exp_nums=None):
         Directory containing numbered experiment subfolders.
     exp_nums : list of int, optional
         List of experiment numbers to load. If None, all numeric subfolders are loaded.
+    normalize : bool, default: False
+        If True, normalize all spectra by their maximum intensity.
+    mass : float or sequence, optional
+        Mass normalization factor for each experiment. Not used if `normalize` is True.
 
     Returns
     -------
     dict
         Bundle containing experiment data dictionaries indexed by experiment name.
-
-    TODO: Add normalization option to get_data_from_folder
-    TODO: Check data dimensionality in get_data_from_folder
     """
 
     # If exp_nums is not provided, use all experiment-numbered folders in dir_path
@@ -97,7 +98,18 @@ def get_data_from_folder(dir_path, exp_nums=None):
     for exp_num in exp_nums:
         exp_path = os.path.join(dir_path, str(exp_num))
         exp_bundle = get_1d_data(exp_path)
+
+        if bundle["data_type"] == "1d":
+            raise ValueError(f"Experiment {exp_num} is not a 1d experiment!")
+
+        if normalize:
+            # y_data -= min(y_data)
+            exp_bundle["y_data"] /= max(exp_bundle["y_data"])
+        else:
+            exp_bundle["y_data"] = exp_bundle["y_data"] / mass
+
         x_vals_list.append(exp_bundle["x_vals_ppm"])
+
         bundle[f"exp_{exp_num}"] = exp_bundle
 
     # If all exps have the same set of x vals, add a key to the bundle with that set
