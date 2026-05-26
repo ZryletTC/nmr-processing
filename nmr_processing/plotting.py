@@ -4,12 +4,10 @@ Functions for plotting data from raw Bruker NMR files.
 All functions return a dictionary containing data and/or figures with appropriate keys.
 
 TODO: add a plot_t1_relaxation function
-TODO: set plwidth/height at plt.subplots, not later
 TODO: Change f1p/f2p to xmax and update the way it's checked
 TODO: Allow kwarg input via bundle
 TODO: Add overlay function for data not in same folder
 TODO: Document bundles
-TODO: Add save_path to rest of plotting functions
 """
 
 import matplotlib.pyplot as plt
@@ -56,7 +54,9 @@ params = {
 plt.rcParams.update(params)
 
 
-def plot_1d(arg, *, proc_num=1, f1p=0, f2p=0, plwidth=15, plheight=12):
+def plot_1d(
+    arg, *, proc_num=1, f1p=0, f2p=0, fig_width=8, fig_height=8, save_path=None
+):
     """
     Plot a 1D NMR spectrum.
 
@@ -70,10 +70,12 @@ def plot_1d(arg, *, proc_num=1, f1p=0, f2p=0, plwidth=15, plheight=12):
         Left x-axis limit in ppm.
     f2p : float, optional
         Right x-axis limit in ppm.
-    plwidth : float, default: 15
+    fig_width : float, default: 8
         Figure width in inches.
-    plheight : float, default: 12
+    fig_height : float, default: 8
         Figure height in inches.
+    save_path : str, optional
+        Path to save the plot figure. If not specified, the figure is not saved.
 
     Returns
     -------
@@ -107,24 +109,25 @@ def plot_1d(arg, *, proc_num=1, f1p=0, f2p=0, plwidth=15, plheight=12):
         x_vals_ppm = x_vals_ppm[x_low:x_high]
         y_data = y_data[x_low:x_high]
 
-    fig, ax = plt.subplots()
-    plt.plot(x_vals_ppm, y_data, "k", linewidth=3)
-    plt.xlabel(x_label_text)
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    ax.plot(x_vals_ppm, y_data, "k", linewidth=3)
+
     if f1p + f2p != 0:
         if f2p > f1p:
-            plt.xlim(f1p, f2p)
+            ax.set_xlim(f1p, f2p)
         else:
-            plt.xlim(f2p, f1p)
+            ax.set_xlim(f2p, f1p)
 
     # ax.spines[['top','right','left']].set_visible(False)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.spines["left"].set_visible(False)
-    plt.yticks([])
+    ax.set_yticks([])
     ax.invert_xaxis()
+    ax.set_xlabel(x_label_text)
 
-    fig.set_figheight(plheight)
-    fig.set_figwidth(plwidth)
+    if save_path:
+        fig.savefig(save_path, bbox_inches="tight", dpi=300)
 
     bundle["fig"] = fig
     bundle["ax"] = ax
@@ -140,9 +143,10 @@ def plot_folder(
     normalize=False,
     f1p=0,
     f2p=0,
-    plwidth=15,
-    plheight=18,
+    fig_width=8,
+    fig_height=8,
     stacking_factor=0,
+    save_path=None,
 ):
     """
     Plot stacked 1D NMR spectra.
@@ -164,14 +168,16 @@ def plot_folder(
         Left x-axis limit in ppm.
     f2p : float, optional
         Right x-axis limit in ppm.
-    plwidth : float, default: 15
+    fig_width : float, default: 8
         Figure width in inches.
-    plheight : float, default: 18
+    fig_height : float, default: 8
         Figure height in inches.
     stacking_factor : float, default: 0
         Vertical offset factor between stacked spectra. A value of 0 will overlay
         spectra (default behavior). A value of 1 will line up spectra baselines with the
         previous spectrum's maximum.
+    save_path : str, optional
+        Path to save the plot figure. If not specified, the figure is not saved.
 
     Returns
     -------
@@ -194,37 +200,37 @@ def plot_folder(
             "bundles to be plot."
         )
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
     y_offset = 0
 
     for exp_num, exp_bundle in bundle.items():
         x_data = exp_bundle["x_vals_ppm"]
         y_data = exp_bundle["y_data"]
 
-        plt.plot(x_data, y_data + y_offset, label=f"exp {exp_num}")
+        ax.plot(x_data, y_data + y_offset, label=f"exp {exp_num}")
         y_offset = y_offset + max(y_data) * stacking_factor
 
     if f1p + f2p != 0:
         if f2p > f1p:
-            plt.xlim(f1p, f2p)
+            ax.set_xlim(f1p, f2p)
         else:
-            plt.xlim(f2p, f1p)
+            ax.set_xlim(f2p, f1p)
 
     # ax.spines[['top','right','left']].set_visible(False)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.spines["left"].set_visible(False)
-    plt.yticks([])
+    ax.set_yticks([])
     ax.invert_xaxis()
-
-    fig.set_figheight(plheight)
-    fig.set_figwidth(plwidth)
 
     # If all nuclei are the same, use specific label, otherwise just use 'shift / ppm'
     if len({exp_bundle["nucleus"] for exp_bundle in bundle}) == 1:
-        plt.xlabel(nucleus_label(bundle))
+        ax.set_xlabel(nucleus_label(bundle))
     else:
-        plt.xlabel("shift / ppm")
+        ax.set_xlabel("shift / ppm")
+
+    if save_path:
+        fig.savefig(save_path, bbox_inches="tight", dpi=300)
 
     bundle["fig"] = fig
     bundle["ax"] = ax
@@ -286,9 +292,10 @@ def plot_2d(  # pylint: disable=too-many-statements
     factor=0.02,
     clevels=10,
     color=True,
-    plheight=12,
-    plwidth=12,
+    fig_height=12,
+    fig_width=12,
     show_projections=True,
+    save_path=None,
 ):
     """
     Plot countours of 2D NMR data.
@@ -313,12 +320,14 @@ def plot_2d(  # pylint: disable=too-many-statements
         Number of contour levels to show in plot.
     color : bool, default: True
         If True, plot color-filled contours. If False, plot black contour lines.
-    plheight : float, default: 12
-        Figure height in inches.
-    plwidth : float, default: 12
+    fig_width : float, default: 8
         Figure width in inches.
+    fig_height : float, default: 8
+        Figure height in inches.
     show_projections : bool, default: True
         If True, show projection traces along both axes. Otherwise, only show 2D plot.
+    save_path : str, optional
+        Path to save the plot figure. If not specified, the figure is not saved.
 
     Returns
     -------
@@ -390,7 +399,7 @@ def plot_2d(  # pylint: disable=too-many-statements
         for i in cc2
     ]
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
 
     if color:
         z = np.ma.masked_where(z <= 0, z)
@@ -405,31 +414,30 @@ def plot_2d(  # pylint: disable=too-many-statements
     else:
         ax.contour(x, y, z, colors="black", levels=thresvec)
 
-    plt.xlabel(nucleus_label(bundle["x_nucleus"]))
-    plt.ylabel(nucleus_label(bundle["y_nucleus"]))
+    ax.set_xlabel(nucleus_label(bundle["x_nucleus"]))
+    ax.set_ylabel(nucleus_label(bundle["y_nucleus"]))
 
     if f1l + f1r != 0:
         if f1l > f1r:
-            plt.ylim(f1r, f1l)
+            ax.set_ylim(f1r, f1l)
         else:
-            plt.ylim(f1l, f1r)
+            ax.set_ylim(f1l, f1r)
 
     if f2l + f2r != 0:
         if f2l > f2r:
-            plt.xlim(f2r, f2l)
+            ax.set_xlim(f2r, f2l)
         else:
-            plt.xlim(f2l, f2r)
+            ax.set_xlim(f2l, f2r)
 
     ax.invert_xaxis()
     ax.invert_yaxis()
 
     if show_projections:
         add_projections(ax, x=x, y=y, z=z)
+        fig.tight_layout()
 
-    fig.set_figheight(plheight)
-    fig.set_figwidth(plwidth)
-
-    plt.tight_layout()
+    if save_path:
+        fig.savefig(save_path, bbox_inches="tight", dpi=300)
 
     bundle["fig"] = fig
     bundle["ax"] = ax
@@ -442,10 +450,10 @@ def plot_slice(
     *,
     proc_num=1,
     slice_idx=0,
-    plwidth=15,
-    plheight=12,
     f2l=1,
     f2r=-1,
+    fig_width=8,
+    fig_height=8,
     save_path=None,
 ):
     """
@@ -460,14 +468,14 @@ def plot_slice(
         provided.
     slice_idx : int, default: 0
         Zero-based index of the slice to plot.
-    plwidth : float, default: 15
-        Figure width in inches.
-    plheight : float, default: 12
-        Figure height in inches.
     f2l : float, default: 1
         Left x-axis limit in ppm.
     f2r : float, default: -1
         Right x-axis limit in ppm.
+    fig_width : float, default: 8
+        Figure width in inches.
+    fig_height : float, default: 8
+        Figure height in inches.
     save_path : str, optional
         Path to save the plot figure. If not specified, the figure is not saved.
 
@@ -495,7 +503,7 @@ def plot_slice(
     y_data = bundle["y_data"]
     nucleus = bundle["nucleus"]
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
     ax.plot(x_vals, y_data[slice_idx])
 
     ax.invert_xaxis()
@@ -509,12 +517,8 @@ def plot_slice(
         else:
             ax.xlim(f2l, f2r)
 
-    fig.tight_layout()
     if save_path:
-        fig.savefig(save_path)
-
-    fig.set_figheight(plheight)
-    fig.set_figwidth(plwidth)
+        fig.savefig(save_path, bbox_inches="tight", dpi=300)
 
     bundle["fig"] = fig
     bundle["ax"] = ax
@@ -523,7 +527,15 @@ def plot_slice(
 
 
 def sim_diffusion(
-    nuclide, *, little_delta=1, big_delta=20, max_gradient=17, diff_coeff=None
+    nuclide,
+    *,
+    little_delta=1,
+    big_delta=20,
+    max_gradient=17,
+    diff_coeff=None,
+    fig_width=8,
+    fig_height=8,
+    save_path=None,
 ):
     """
     Simulate and plot the attenuation curve of a diffusion experiment.
@@ -544,6 +556,12 @@ def sim_diffusion(
     diff_coeff : float or array-like, optional
         Diffusion coefficient(s) in m^2/s. If not specified, a default log-spaced range
         is used.
+    fig_width : float, default: 8
+        Figure width in inches.
+    fig_height : float, default: 8
+        Figure height in inches.
+    save_path : str, optional
+        Path to save the plot figure. If not specified, the figure is not saved.
 
     Returns
     -------
@@ -578,7 +596,7 @@ def sim_diffusion(
 
     # TODO: Refactor sim_diffusion so its not so big and requiring a huge if
     #       Start by making diff_coeff into a list even if len == 1
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
     if multiple:
         intensity_data = np.zeros(shape=(len(diff_coeff), len(gradient_vals)))
         cnt = 0
@@ -588,7 +606,7 @@ def sim_diffusion(
 
         colmap = colormaps["seismic"](np.linspace(0, 1, len(diff_coeff)))
         for k, c in zip(range(len(diff_coeff)), colmap):
-            plt.plot(
+            ax.plot(
                 gradient_vals,
                 intensity_data[k, :],
                 color=c,
@@ -598,7 +616,7 @@ def sim_diffusion(
     else:
         intensity_data = np.exp(np.multiply(-diff_coeff, exponent_coefficient_list))
 
-        plt.plot(
+        ax.plot(
             gradient_vals,
             intensity_data,
             linewidth=2,
@@ -606,9 +624,12 @@ def sim_diffusion(
             label=str(diff_coeff) + r" $\mathregular{m^2 s^{–1}}$",
         )
     ax.set_xlim(0, max_gradient * 1.25)
-    plt.legend(loc="upper right", frameon=False)
-    plt.xlabel(r"Gradient Strength, g / $\mathregular{T m^{–1}}$")
-    plt.ylabel(r"Intensity, $\mathregular{I/I_0}$")
+    ax.legend(loc="upper right", frameon=False)
+    ax.set_xlabel(r"Gradient Strength, g / $\mathregular{T m^{–1}}$")
+    ax.set_ylabel(r"Intensity, $\mathregular{I/I_0}$")
+
+    if save_path:
+        fig.savefig(save_path, bbox_inches="tight", dpi=300)
 
     bundle = {
         "fig": fig,
@@ -625,7 +646,9 @@ def sim_diffusion(
     return bundle
 
 
-def plot_t2_relaxation(peak_ints_norm, *, l1, l2, cnst31):
+def plot_t2_relaxation(
+    peak_ints_norm, *, l1, l2, cnst31, fig_width=8, fig_height=8, save_path=None
+):
     """
     Plot data of a T2 relaxation experiment. Use `get_pseudo2d_data` to read data.
 
@@ -639,6 +662,12 @@ def plot_t2_relaxation(peak_ints_norm, *, l1, l2, cnst31):
         Number of rotor periods pulse delay in incremented between slices.
     cnst31 : float
         MAS spinning rate in Hz.
+    fig_width : float, default: 8
+        Figure width in inches.
+    fig_height : float, default: 8
+        Figure height in inches.
+    save_path : str, optional
+        Path to save the plot figure. If not specified, the figure is not saved.
 
     TODO: Wrap T2_plot so user can provide just exp_path
     """
@@ -650,13 +679,16 @@ def plot_t2_relaxation(peak_ints_norm, *, l1, l2, cnst31):
     )
     echo_delay *= 1000  # unit = ms
 
-    _, ax = plt.subplots()
-    plt.plot(echo_delay, peak_ints_norm)
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    ax.plot(echo_delay, peak_ints_norm)
     ax.set_xlabel("Echo delay / ms")
     ax.set_ylabel("Normalized Intensity")
 
+    if save_path:
+        fig.savefig(save_path, bbox_inches="tight", dpi=300)
 
-def diff_plot(peak_ints_norm, exp_path):
+
+def diff_plot(peak_ints_norm, exp_path, *, fig_width=8, fig_height=8, save_path=None):
     """
     Plot diffusion attenuation data against gradient strength.
 
@@ -666,6 +698,12 @@ def diff_plot(peak_ints_norm, exp_path):
         Normalized peak intensities from the diffusion experiment.
     exp_path : str
         Path to the experiment directory containing diff.xml metadata.
+    fig_width : float, default: 8
+        Figure width in inches.
+    fig_height : float, default: 8
+        Figure height in inches.
+    save_path : str, optional
+        Path to save the plot figure. If not specified, the figure is not saved.
 
     Returns
     -------
@@ -677,12 +715,15 @@ def diff_plot(peak_ints_norm, exp_path):
 
     bundle = get_diff_params(exp_path)
 
-    fig, ax = plt.subplots()
-    plt.plot(
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    ax.plot(
         bundle["gradient_list"], peak_ints_norm, "o"
     )  # , c='red', mfc='blue', mec='blue')
     ax.set_xlabel(r"Gradient Strength / G cm$\mathregular{^{-1}}$")
     ax.set_ylabel("Normalized Intensity")
+
+    if save_path:
+        fig.savefig(save_path, bbox_inches="tight", dpi=300)
 
     bundle["fig"] = fig
     bundle["ax"] = ax
