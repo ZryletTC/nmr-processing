@@ -197,10 +197,10 @@ def get_diff_params(exp_path):
     tree = ElementTree.parse(xml_path)
     root = tree.getroot()
 
-    little_delta = float(root.find(".//little_delta").text)  # [ms]
+    little_delta = float(root.find(".//delta").text)  # [ms]
     little_delta = little_delta / 1000  # [s]
 
-    big_delta = float(root.find(".//big_delta").text)  # [ms]
+    big_delta = float(root.find(".//DELTA").text)  # [ms]
     big_delta = big_delta / 1000  # [s]
 
     diff_coeff_estimate = float(root.find(".//exDiffCoff").text)  # [m2/s]
