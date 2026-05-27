@@ -23,8 +23,8 @@ from nmr_processing.plotting import plot_1d
 from nmr_processing.processing import (
     get_1d_data,
     get_data_from_folder,
-    get_peak_slice_intensities,
     get_pseudo2d_data,
+    pick_peaks_pseudo2d,
 )
 
 
@@ -196,7 +196,8 @@ def process_sir(
     y_data = np.array(bundle["y_data"])
 
     if peak_pos:
-        intensities = get_peak_slice_intensities(x_vals_ppm, y_data, peak_pos=peak_pos)
+        peak_pick_bundle = pick_peaks_pseudo2d(bundle, peak_pos=peak_pos)
+        intensities = peak_pick_bundle["peak_ints_norm"]
     elif regions:
         ints = []
         for x_min, x_max in regions:
@@ -206,9 +207,7 @@ def process_sir(
             ints.append(np.trapz(x_vals_ppm[idx_filter], y_data[idx_filter]))
         intensities = np.concatenate(ints, axis=1)
     else:
-        peak_pick_bundle = get_peak_slice_intensities(
-            x_vals_ppm, y_data, prominence=[0.9, 1]
-        )
+        peak_pick_bundle = pick_peaks_pseudo2d(bundle, prominence=[0.9, 1])
         intensities = peak_pick_bundle["peak_ints_norm"]
 
     return delays, intensities
@@ -717,7 +716,7 @@ def get_1d_exsy_data(dir_path, exp_nums):
     # CHECK: order might be messed up in dict?
     y_data = [exp_bundle["y_data"] for _, exp_bundle in data_bundle.items()]
 
-    proc_bundle = get_peak_slice_intensities(x_vals_ppm=x_vals_ppm, y_data=y_data)
+    proc_bundle = pick_peaks_pseudo2d(x_vals_ppm=x_vals_ppm, y_data=y_data)
     peak_ints_norm = proc_bundle["peak_ints_norm"]
 
     return d15_vals, peak_ints_norm
