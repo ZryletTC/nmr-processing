@@ -226,7 +226,7 @@ def make_cifit_files(
     initial_mag_guesses=None,
     final_mag_guesses=None,
     matrix=None,
-    tp2=False,
+    specify_vary=False,
 ):
     """
     Create CIFIT (`.dat` and `.mch`) input files from delay/intensity data.
@@ -259,9 +259,9 @@ def make_cifit_files(
     matrix : array-like, optional
         2D matrix describing off-diagonal contributions to exchange matrix. By default,
         this assumes all sites participate in exchange and have equal populations.
-    tp2 : bool, default: False
-        If True, write TP2-style mechanism parameters. Otherwise, write file according
-        to Bain as defined in his cifman.pdf.
+    specify_vary : bool, default: False
+        If True, write in the .mch file whether parameters should be varied. Otherwise,
+        write the file as Bain originally defined in his cifman.pdf.
     """
 
     make_dat_file(
@@ -286,7 +286,7 @@ def make_cifit_files(
         initial_mag_guesses=initial_mag_guesses,
         final_mag_guesses=final_mag_guesses,
         r1_guesses=r1_guesses,
-        tp2=tp2,
+        specify_vary=specify_vary,
         k_guesses=k_guesses,
         matrix=matrix,
     )
@@ -303,14 +303,13 @@ def make_mch_file(
     final_mag_guesses=None,
     matrix=None,
     title="TEST",
-    tp2=False,
+    specify_vary=False,
 ):
     """
     Write a CIFIT mechanism (.mch) file describing the relaxation mechanism.
 
-    tp2 hard codes varying rate and M0 but keeping M_inf and T1s constant,
-    for use with cifit2.1 aka cifit2 aka cifit_tp2
-    TODO: Rename tp2
+    specify_vary hard codes varying rate and M0 but keeping M_inf and T1s constant
+    (for use with cifit2.1 aka cifit2 aka cifit_tp2)
 
     Parameters
     ----------
@@ -337,9 +336,9 @@ def make_mch_file(
         this assumes all sites participate in exchange and have equal populations.
     title : str, default: "TEST"
         Title written to the header of the .mch file.
-    tp2 : bool, default: False
-        If True, write TP2-style mechanism parameters. Otherwise, write file according
-        to Bain as defined in his cifman.pdf.
+    specify_vary : bool, default: False
+        If True, write in the .mch file whether parameters should be varied. Otherwise,
+        write the file as Bain originally defined in his cifman.pdf.
     """
 
     if matrix:
@@ -368,7 +367,7 @@ def make_mch_file(
         raise ValueError("`r1_guesses` must be of length `sites`!")
 
     mch_lines.extend(["", " ".join(map(str, r1_guesses))])
-    if tp2:
+    if specify_vary:
         mch_lines.append(" ".join(map(str, np.ones(sites, dtype=np.int8))))
 
     if final_mag_guesses:
@@ -377,7 +376,7 @@ def make_mch_file(
     else:
         final_mag_guesses = np.ones(sites)  # Final intensities are normalized, so 1
     mch_lines.extend(["", " ".join(map(str, final_mag_guesses))])
-    if tp2:
+    if specify_vary:
         mch_lines.append(" ".join(map(str, np.ones(sites, dtype=np.int8))))
 
     if initial_mag_guesses:
@@ -387,7 +386,7 @@ def make_mch_file(
         # FIXME: This is a bad guess, it should be more like 1, -1
         initial_mag_guesses = np.ones(sites)
     mch_lines.extend(["", " ".join(map(str, initial_mag_guesses))])
-    if tp2:
+    if specify_vary:
         mch_lines.append(" ".join(map(str, np.ones(sites, dtype=np.int8))))
 
     if k_guesses:
@@ -397,7 +396,7 @@ def make_mch_file(
         k_guesses = np.ones(processes)  # FIXME: This is a bad guess
 
     for i in range(processes):
-        if tp2:
+        if specify_vary:
             # rate guess for the mechanism, with variation specified
             mch_lines.extend(["", str(k_guesses[i]) + " 1"])
         else:
@@ -479,7 +478,7 @@ def exp_to_cifit(
     final_mag_guesses=None,
     matrix=None,
     use_t1ints=True,
-    tp2=False,
+    specify_vary=False,
 ):
     """
     Convert a T1/SIR experiment directly from Bruker data files into CIFIT input files.
@@ -518,9 +517,9 @@ def exp_to_cifit(
     use_t1ints : bool, default: True
         If True, read data from `t1ints.txt`. Otherwise, extract intensities from
         processed pseudo-2D data in Bruker files.
-    tp2 : bool, default: False
-        If True, write TP2-style mechanism parameters. Otherwise, write file according
-        to Bain as defined in his cifman.pdf.
+    specify_vary : bool, default: False
+        If True, write in the .mch file whether parameters should be varied. Otherwise,
+        write the file as Bain originally defined in his cifman.pdf.
 
     Examples
     --------
@@ -561,7 +560,7 @@ def exp_to_cifit(
         title=title,
         peak_names=peak_names,
         r1_guesses=r1_guesses,
-        tp2=tp2,
+        specify_vary=specify_vary,
         k_guesses=k_guesses,
         matrix=matrix,
         initial_mag_guesses=initial_mag_guesses,
@@ -570,7 +569,7 @@ def exp_to_cifit(
 
 
 def plot_cifit_csv(
-    file_path, *, n_sites=2, site_names=None, data_rows=16, fit_rows=101, save_path=None
+    file_path, *, site_names=None, data_rows=16, fit_rows=101, save_path=None
 ):
     """
     Plot CIFIT result data from the output CSV file.
@@ -579,8 +578,6 @@ def plot_cifit_csv(
     ----------
     file_path : str
         Path to the CIFIT CSV file.
-    n_sites : int, default: 2
-        Number of sites analyzed.
     site_names : list of str, optional
         Labels for each site to display in plot legend.
     n_data_rows : int, default: 16
@@ -590,9 +587,15 @@ def plot_cifit_csv(
     save_path : str, optional
         Output file path for the saved figure. If not specified, saves a PDF file with
         the same basename as the CSV.
-
-    TODO: Autodetect n_sites from CSV shape in plot_cifit_csv
     """
+
+    # Set n_sites from the number of columns in the CSV file
+    # Format = delay, calc1, calc2, ..., data1, data2, ..., diff1, diff2, ...
+    with open(file_path, "r", encoding="utf-8") as f:
+        f.readline()  # skip header lines
+        line = f.readline()
+        n_cols = len(re.findall(r'[.\d]+', line))
+        n_sites = (n_cols - 1) // 3
 
     cols = ["delay"]
     cols.extend(map(str, range(n_sites * 3)))

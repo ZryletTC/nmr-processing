@@ -218,8 +218,8 @@ def fit_T1_IR(
 
     Parameters
     ----------
-    delay_data : list of array-like
-        Delay times for each component in seconds.
+    delay_data : array-like
+        Delay times in seconds.
     intensity_data : list of array-like
         Intensity values to fit for each component.
     labels : list of str, optional
@@ -237,7 +237,7 @@ def fit_T1_IR(
     Returns
     -------
     list
-        List of T1 relaxation times in seconds.
+        T1 relaxation times in seconds for each component.
     """
 
     extracted_intensities = []
@@ -349,8 +349,8 @@ def fit_T1_SR(
 
     Parameters
     ----------
-    delay_data : list of array-like
-        Delay times for each component in seconds.
+    delay_data : array-like
+        Delay times in seconds.
     intensity_data : list of array-like
         Intensity values to fit for each component.
     labels : list of str, optional
@@ -368,7 +368,7 @@ def fit_T1_SR(
     Returns
     -------
     list
-        List of T1 relaxation times in seconds.
+        T1 relaxation times in seconds for each component.
     """
 
     extracted_intensities = []
@@ -503,26 +503,27 @@ def fit_T1_spectra(
     ----------
     data_files : list of strings
         List of files containing T1 relaxation experiments, with varying interpulse
-        delays
-    delays : array of floats
-        List of delays for each of the spectra in data_files, index-matched
+        delays.
+    delays : array-like
+        List of delays for each of the spectra in data_files, index-matched.
     normalize : boolean
-        Whether or not to normalize the plot for T1 intensity decay
+        Whether or not to normalize the plot for T1 intensity decay.
     **kwargs : key-word arguments
         key-word arguments corresponding to the `fit` function. See `fit` function
-        for details
+        for details.
     Returns
     -------
     T1_list : array of floats
-        list of T1 constants (in s) corresponding to each component or group of
-        components specified in intensity_data, index-matched
+        T1 constants (in s) corresponding to each component or group of
+        components specified in intensity_data, index-matched.
     unscaled_percentages : array of floats
-        list of unscaled molar percentages of each component or group of components
-        specified in intensity_data, index-matched
+        Unscaled molar percentages of each component or group of components
+        specified in intensity_data, index-matched.
     scaled_percentages : array of floats
-        list of T2 scaled molar percentages of each component or group of components
-        specified in intensity_data, index-matched
+        T2 scaled molar percentages of each component or group of components
+        specified in intensity_data, index-matched.
     """
+
     amplitudes = []
     comp_group_index = []
     comp_labels = []

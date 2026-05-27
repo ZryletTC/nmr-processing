@@ -10,6 +10,8 @@ TODO: Add overlay function for data not in same folder
 TODO: Document bundles
 """
 
+from collections.abc import Sequence
+
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import colormaps
@@ -577,9 +579,7 @@ def sim_diffusion(
         diff_coeff = np.logspace(-8, -15, 8)
 
     multiple = False
-    if isinstance(
-        diff_coeff, list
-    ):  # TODO: Accept arrays as well as lists, check iterable
+    if isinstance(diff_coeff, Sequence):
         multiple = len(diff_coeff) > 1
         if not multiple:
             diff_coeff = diff_coeff[0]
