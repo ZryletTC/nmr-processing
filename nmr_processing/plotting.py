@@ -23,6 +23,7 @@ from nmr_processing.processing import (
     get_2d_data,
     get_data_from_folder,
     get_diff_params,
+    get_peak_slice_intensities,
     get_pseudo2d_data,
 )
 from nmr_processing.utils import find_gamma, nucleus_label
@@ -688,16 +689,28 @@ def plot_t2_relaxation(
         fig.savefig(save_path, bbox_inches="tight", dpi=300)
 
 
-def diff_plot(peak_ints_norm, exp_path, *, fig_width=8, fig_height=8, save_path=None):
+def diff_plot(
+    exp_path,
+    *,
+    peak_pos=None,
+    prominence=None,
+    fig_width=8,
+    fig_height=8,
+    save_path=None,
+):
     """
     Plot diffusion attenuation data against gradient strength.
 
     Parameters
     ----------
-    peak_ints_norm : array-like
-        Normalized peak intensities from the diffusion experiment.
     exp_path : str
         Path to the experiment directory containing diff.xml metadata.
+    peak_pos : array-like, optional
+        Position(s) in ppm of peaks to extract. If None, peaks are automatically
+        detected automatically using `scipy.signal.find_peaks`.
+    prominence : number or ndarray or sequence, default: [0.5, 1]
+        Prominence range passed to `scipy.signal.find_peaks` when peaks are
+        auto-detected. Not used if `peak_pos` is provided.
     fig_width : float, default: 8
         Figure width in inches.
     fig_height : float, default: 8
@@ -709,18 +722,24 @@ def diff_plot(peak_ints_norm, exp_path, *, fig_width=8, fig_height=8, save_path=
     -------
     dict
         Bundle containing the generated figure, axes, and diffusion data.
-
-    TODO: Add data getting to diff_plot so peak_ints_norm is not needed
     """
 
-    bundle = get_diff_params(exp_path)
+    bundle = get_pseudo2d_data(exp_path)
+    bundle.update(get_diff_params(exp_path))
+    bundle.update(
+        get_peak_slice_intensities(
+            bundle, prominence=prominence, peak_pos=peak_pos, normalize=True
+        )
+    )
 
     fig, ax = plt.subplots(figsize=(fig_width, fig_height))
     ax.plot(
-        bundle["gradient_list"], peak_ints_norm, "o"
+        bundle["gradient_list"], bundle["peak_ints_norm"], "o"
     )  # , c='red', mfc='blue', mec='blue')
     ax.set_xlabel(r"Gradient Strength / G cm$\mathregular{^{-1}}$")
     ax.set_ylabel("Normalized Intensity")
+
+    fig.tight_layout()
 
     if save_path:
         fig.savefig(save_path, bbox_inches="tight", dpi=300)
