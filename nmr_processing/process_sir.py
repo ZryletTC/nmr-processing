@@ -569,7 +569,7 @@ def exp_to_cifit(
 
 
 def plot_cifit_csv(
-    file_path, *, n_sites=2, site_names=None, data_rows=16, fit_rows=101, save_path=None
+    file_path, *, site_names=None, data_rows=16, fit_rows=101, save_path=None
 ):
     """
     Plot CIFIT result data from the output CSV file.
@@ -578,8 +578,6 @@ def plot_cifit_csv(
     ----------
     file_path : str
         Path to the CIFIT CSV file.
-    n_sites : int, default: 2
-        Number of sites analyzed.
     site_names : list of str, optional
         Labels for each site to display in plot legend.
     n_data_rows : int, default: 16
@@ -589,9 +587,15 @@ def plot_cifit_csv(
     save_path : str, optional
         Output file path for the saved figure. If not specified, saves a PDF file with
         the same basename as the CSV.
-
-    TODO: Autodetect n_sites from CSV shape in plot_cifit_csv
     """
+
+    # Set n_sites from the number of columns in the CSV file
+    # Format = delay, calc1, calc2, ..., data1, data2, ..., diff1, diff2, ...
+    with open(file_path, "r", encoding="utf-8") as f:
+        f.readline()  # skip header lines
+        line = f.readline()
+        n_cols = len(re.findall(r'[.\d]+', line))
+        n_sites = (n_cols - 1) // 3
 
     cols = ["delay"]
     cols.extend(map(str, range(n_sites * 3)))
