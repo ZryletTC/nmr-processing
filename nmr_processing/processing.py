@@ -296,7 +296,7 @@ def get_peak_slice_intensities(
     peak_pos : array-like, optional
         Position(s) in ppm of peaks to extract. If None, peaks are automatically
         detected automatically using `scipy.signal.find_peaks`.
-    prominence : tuple or list, default: [0.001, 1]
+    prominence : number or ndarray or sequence, default: [0.001, 1]
         Prominence range passed to `scipy.signal.find_peaks` when peaks are
         auto-detected.
     normalize : bool, default: True
