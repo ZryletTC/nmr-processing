@@ -275,7 +275,7 @@ def get_pseudo2d_data(exp_path, *, proc_num=1):
     return bundle
 
 
-def get_peak_slice_intensities(
+def pick_peaks_pseudo2d(
     bundle=None,
     *,
     x_vals_ppm=None,
@@ -313,7 +313,7 @@ def get_peak_slice_intensities(
         Bundle containing peak indices, ppm positions, raw intensities, and normalized
         intensities.
 
-    TODO: allow no xdata input to get_peak_slice_intensities
+    TODO: allow no xdata input to pick_peaks_pseudo2d
     """
 
     # Unpack or create bundle depending on args

@@ -23,8 +23,8 @@ from nmr_processing.processing import (
     get_2d_data,
     get_data_from_folder,
     get_diff_params,
-    get_peak_slice_intensities,
     get_pseudo2d_data,
+    pick_peaks_pseudo2d,
 )
 from nmr_processing.utils import find_gamma, nucleus_label
 
@@ -689,7 +689,7 @@ def plot_t2_relaxation(
         fig.savefig(save_path, bbox_inches="tight", dpi=300)
 
 
-def diff_plot(
+def plot_diffusion(
     exp_path,
     *,
     peak_pos=None,
@@ -727,7 +727,7 @@ def diff_plot(
     bundle = get_pseudo2d_data(exp_path)
     bundle.update(get_diff_params(exp_path))
     bundle.update(
-        get_peak_slice_intensities(
+        pick_peaks_pseudo2d(
             bundle, prominence=prominence, peak_pos=peak_pos, normalize=True
         )
     )
