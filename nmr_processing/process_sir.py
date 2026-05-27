@@ -281,7 +281,7 @@ def make_cifit_files(
     make_mch_file(
         filename,
         title=title,
-        sites=intensities.shape[1],
+        n_sites=intensities.shape[1],
         initial_mag_guesses=initial_mag_guesses,
         final_mag_guesses=final_mag_guesses,
         r1_guesses=r1_guesses,
@@ -294,8 +294,8 @@ def make_cifit_files(
 def make_mch_file(
     filename,
     *,
-    sites=2,
-    processes=1,
+    n_sites=2,
+    n_procs=1,
     r1_guesses=None,
     k_guesses=None,
     initial_mag_guesses=None,
@@ -314,9 +314,9 @@ def make_mch_file(
     ----------
     filename : str
         Base filename for the output file (without extension).
-    sites : int, default: 2
+    n_sites : int, default: 2
         Number of sites being analyzed.
-    processes : int, default: 1
+    n_procs : int, default: 1
         Number of exchange processes.
     r1_guesses : list of float, optional
         Initial guess of R1 relaxation rates in Hz for each site. The default guesses
@@ -342,13 +342,13 @@ def make_mch_file(
 
     if matrix:
         matrix = np.array(matrix)
-        if matrix.shape != (sites, sites):
+        if matrix.shape != (n_sites, n_sites):
             raise ValueError(
-                "matrix must be a square array of shape `sites` by `sites`!"
+                "matrix must be a square array of shape `n_sites` by `n_sites`!"
             )
     else:
-        if processes == 1:
-            matrix = np.ones((sites, sites)) - np.diag(np.ones(sites))
+        if n_procs == 1:
+            matrix = np.ones((n_sites, n_sites)) - np.diag(np.ones(n_sites))
         else:
             raise NotImplementedError(
                 "This function can't currently handle "
@@ -358,53 +358,53 @@ def make_mch_file(
 
     mch_lines = [title]
 
-    mch_lines.extend(["", f"{sites} {processes}"])
+    mch_lines.extend(["", f"{n_sites} {n_procs}"])
 
     if not r1_guesses:
         r1_guesses = [1 / 0.462, 1 / 2.141]  # Example reciprocal of LPSC and LZC T1s
-    elif len(r1_guesses) != sites:
-        raise ValueError("`r1_guesses` must be of length `sites`!")
+    elif len(r1_guesses) != n_sites:
+        raise ValueError("`r1_guesses` must be of length `n_sites`!")
 
     mch_lines.extend(["", " ".join(map(str, r1_guesses))])
     if specify_vary:
-        mch_lines.append(" ".join(map(str, np.ones(sites, dtype=np.int8))))
+        mch_lines.append(" ".join(map(str, np.ones(n_sites, dtype=np.int8))))
 
     if final_mag_guesses:
-        if len(final_mag_guesses) != sites:
-            raise ValueError("`final_mag_guesses` must be of length `sites`!")
+        if len(final_mag_guesses) != n_sites:
+            raise ValueError("`final_mag_guesses` must be of length `n_sites`!")
     else:
-        final_mag_guesses = np.ones(sites)  # Final intensities are normalized, so 1
+        final_mag_guesses = np.ones(n_sites)  # Final intensities are normalized, so 1
     mch_lines.extend(["", " ".join(map(str, final_mag_guesses))])
     if specify_vary:
-        mch_lines.append(" ".join(map(str, np.ones(sites, dtype=np.int8))))
+        mch_lines.append(" ".join(map(str, np.ones(n_sites, dtype=np.int8))))
 
     if initial_mag_guesses:
-        if len(initial_mag_guesses) != sites:
-            raise ValueError("`initial_mag_guesses` must be of length `sites`!")
+        if len(initial_mag_guesses) != n_sites:
+            raise ValueError("`initial_mag_guesses` must be of length `n_sites`!")
     else:
         # FIXME: This is a bad guess, it should be more like 1, -1
-        initial_mag_guesses = np.ones(sites)
+        initial_mag_guesses = np.ones(n_sites)
     mch_lines.extend(["", " ".join(map(str, initial_mag_guesses))])
     if specify_vary:
-        mch_lines.append(" ".join(map(str, np.ones(sites, dtype=np.int8))))
+        mch_lines.append(" ".join(map(str, np.ones(n_sites, dtype=np.int8))))
 
     if k_guesses:
-        if len(k_guesses) != sites:
-            raise ValueError("`k_guesses` must be of length `sites`!")
+        if len(k_guesses) != n_sites:
+            raise ValueError("`k_guesses` must be of length `n_sites`!")
     else:
-        k_guesses = np.ones(processes)  # FIXME: This is a bad guess
+        k_guesses = np.ones(n_procs)  # FIXME: This is a bad guess
 
-    for i in range(processes):
+    for i in range(n_procs):
         if specify_vary:
             # rate guess for the mechanism, with variation specified
             mch_lines.extend(["", str(k_guesses[i]) + " 1"])
         else:
             # rate guess for the mechanism
             mch_lines.extend(["", str(k_guesses[i])])
-        mch_lines.append(str(sites * (sites - 1)))  # number of off-diagonals
+        mch_lines.append(str(n_sites * (n_sites - 1)))  # number of off-diagonals
 
-        for j in range(sites):
-            for k in range(sites):
+        for j in range(n_sites):
+            for k in range(n_sites):
                 if matrix[j][k] != 0:
                     mch_lines.append(f"{j} {k} {matrix[j][k]}")
 
@@ -452,11 +452,11 @@ def make_dat_file(filename, delays, intensities, *, title="TEST", peak_names=Non
     delays = delays.reshape(numpoints, 1)
     data = np.concatenate((delays, intensities), axis=1)
 
-    def format_array(arr):
+    def _format_array(arr):
         return np.array2string(arr, precision=6, suppress_small=True)
 
     for line in data:
-        data_lines.append("\t".join(map(format_array, line)))
+        data_lines.append("\t".join(map(_format_array, line)))
     # data_str = np.array_str(data, precision=5, suppress_small=True)
     # data_lines.extend(data_str.strip('[] ').split(']\n ['))
 
@@ -568,7 +568,7 @@ def exp_to_cifit(
 
 
 def plot_cifit_csv(
-    file_path, *, site_names=None, data_rows=16, fit_rows=101, save_path=None
+    file_path, *, site_names=None, n_data_rows=16, n_fit_rows=101, save_path=None
 ):
     """
     Plot CIFIT result data from the output CSV file.
@@ -581,7 +581,7 @@ def plot_cifit_csv(
         Labels for each site to display in plot legend.
     n_data_rows : int, default: 16
         Number of data rows to read from the CSV file.
-    fit_rows : int, default: 101
+    n_fit_rows : int, default: 101
         Number of smooth-fit rows to read from the CSV file.
     save_path : str, optional
         Output file path for the saved figure. If not specified, saves a PDF file with
@@ -593,7 +593,7 @@ def plot_cifit_csv(
     with open(file_path, "r", encoding="utf-8") as f:
         f.readline()  # skip header lines
         line = f.readline()
-        n_cols = len(re.findall(r'[.\d]+', line))
+        n_cols = len(re.findall(r"[.\d]+", line))
         n_sites = (n_cols - 1) // 3
 
     cols = ["delay"]
@@ -601,7 +601,7 @@ def plot_cifit_csv(
     data_df = pd.read_csv(
         file_path,
         sep=None,
-        nrows=data_rows,
+        nrows=n_data_rows,
         skiprows=1,
         header=None,
         index_col=False,
@@ -615,8 +615,8 @@ def plot_cifit_csv(
     fit_df = pd.read_csv(
         file_path,
         sep=None,
-        nrows=fit_rows,
-        skiprows=3 + data_rows,
+        nrows=n_fit_rows,
+        skiprows=3 + n_data_rows,
         header=None,
         index_col=False,
         names=cols,
