@@ -276,9 +276,10 @@ def get_pseudo2d_data(exp_path, *, proc_num=1):
 
 
 def get_peak_slice_intensities(
-    x_vals_ppm,
-    y_data,
+    bundle=None,
     *,
+    x_vals_ppm=None,
+    y_data=None,
     peak_pos=None,
     prominence=None,
     normalize=True,
@@ -289,6 +290,9 @@ def get_peak_slice_intensities(
 
     Parameters
     ----------
+    bundle : dict, optional
+        Data bundle containing keys 'x_vals_ppm' and 'y_data' for the pseudo-2D dataset.
+        If provided, these values will be used instead of the corresponding parameters.
     x_vals_ppm : array-like
         X-axis values in ppm.
     y_data : array-like
@@ -296,9 +300,9 @@ def get_peak_slice_intensities(
     peak_pos : array-like, optional
         Position(s) in ppm of peaks to extract. If None, peaks are automatically
         detected automatically using `scipy.signal.find_peaks`.
-    prominence : number or ndarray or sequence, default: [0.001, 1]
+    prominence : number or ndarray or sequence, default: [0.5, 1]
         Prominence range passed to `scipy.signal.find_peaks` when peaks are
-        auto-detected.
+        auto-detected. Not used if `peak_pos` is provided.
     normalize : bool, default: True
         If True, normalize each spectrum by the maximum intensity of all slices.
         Otherwise, return raw intensities.
@@ -309,18 +313,20 @@ def get_peak_slice_intensities(
         Bundle containing peak indices, ppm positions, raw intensities, and normalized
         intensities.
 
-    TODO: add bundle input to get_peak_slice_intensities
     TODO: allow no xdata input to get_peak_slice_intensities
     """
 
-    # Convert data into nparray if not already
-    x_vals_ppm = np.array(x_vals_ppm)
-    y_data = np.array(y_data)
+    # Unpack or create bundle depending on args
+    if bundle:
+        x_vals_ppm = bundle["x_vals_ppm"]
+        y_data = bundle["y_data"]
+    else:
+        bundle = {"x_vals_ppm": np.array(x_vals_ppm), "y_data": np.array(y_data)}
 
     if peak_pos is None:
         # Find peaks using find_peaks if peak_pos not provided
         if prominence is None:
-            prominence = [0.001, 1]
+            prominence = [0.5, 1]
         # Choose the slice with the highest total intensity for peak picking
         best_slice = max(y_data, key=np.sum)
         best_slice = best_slice - min(best_slice)
@@ -336,11 +342,9 @@ def get_peak_slice_intensities(
     # Get intensities of picked peaks in all slices
     peak_ints = np.array([[y_slice[i] for i in peak_idx] for y_slice in y_data])
 
-    bundle = {
-        "peak_idx": peak_idx,
-        "peak_pos_ppm": peak_pos,
-        "peak_ints": peak_ints
-    }
+    bundle.update(
+        {"peak_idx": peak_idx, "peak_pos_ppm": peak_pos, "peak_ints": peak_ints}
+    )
 
     if normalize:
         # Normalize by max intensity of each peak, and add to bundle
